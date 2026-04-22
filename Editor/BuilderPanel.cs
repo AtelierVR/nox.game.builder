@@ -42,6 +42,51 @@ namespace Nox.GameBuilder {
 			}
 		}
 
+		public static bool OptDevelopment {
+			get => Config.LoadEditor().Get("game.builder.opt.development", false);
+			set {
+				var config = Config.LoadEditor();
+				config.Set("game.builder.opt.development", value);
+				config.Save();
+			}
+		}
+
+		public static bool OptAllowDebugging {
+			get => Config.LoadEditor().Get("game.builder.opt.allow_debugging", false);
+			set {
+				var config = Config.LoadEditor();
+				config.Set("game.builder.opt.allow_debugging", value);
+				config.Save();
+			}
+		}
+
+		public static bool OptProfiler {
+			get => Config.LoadEditor().Get("game.builder.opt.profiler", false);
+			set {
+				var config = Config.LoadEditor();
+				config.Set("game.builder.opt.profiler", value);
+				config.Save();
+			}
+		}
+
+		public static bool OptScriptsOnly {
+			get => Config.LoadEditor().Get("game.builder.opt.scripts_only", false);
+			set {
+				var config = Config.LoadEditor();
+				config.Set("game.builder.opt.scripts_only", value);
+				config.Save();
+			}
+		}
+
+		public static bool OptDeepProfiling {
+			get => Config.LoadEditor().Get("game.builder.opt.deep_profiling", false);
+			set {
+				var config = Config.LoadEditor();
+				config.Set("game.builder.opt.deep_profiling", value);
+				config.Save();
+			}
+		}
+
 		public IInstance Instantiate(IWindow window, Dictionary<string, object> data) {
 			if (Instance != null)
 				throw new InvalidOperationException($"{nameof(BuilderPanel)} only supports a single instance.");

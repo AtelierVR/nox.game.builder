@@ -72,10 +72,18 @@ namespace Nox.GameBuilder {
 		}
 
 		private void OnBuildClicked(ClickEvent evt) {
+			var options = BuildOptions.None;
+			if (BuilderPanel.OptDevelopment)   options |= BuildOptions.Development;
+			if (BuilderPanel.OptAllowDebugging) options |= BuildOptions.AllowDebugging;
+			if (BuilderPanel.OptProfiler)      options |= BuildOptions.ConnectWithProfiler;
+			if (BuilderPanel.OptScriptsOnly)   options |= BuildOptions.BuildScriptsOnly;
+			if (BuilderPanel.OptDeepProfiling) options |= BuildOptions.EnableDeepProfilingSupport;
+
 			var data = new BuildData {
-				OutputPath = BuilderPanel.OutputFolder,
-				Mods       = Builder.GetKernelMods(_panel.API.ModAPI.GetMods()),
-				Target     = (Platform)_platformEnum.value
+				OutputPath   = BuilderPanel.OutputFolder,
+				Mods         = Builder.GetKernelMods(_panel.API.ModAPI.GetMods()),
+				Target       = (Platform)_platformEnum.value,
+				BuildOptions = options
 			};
 
 			Builder.Build(data).Forget();
@@ -133,6 +141,12 @@ namespace Nox.GameBuilder {
 		private Button        _selectOutputButton;
 		private EnumField     _platformEnum;
 
+		private Toggle _optDevelopment;
+		private Toggle _optAllowDebugging;
+		private Toggle _optProfiler;
+		private Toggle _optScriptsOnly;
+		private Toggle _optDeepProfiling;
+
 		private VisualElement _buildingContainer;
 		private Label         _buildingStatusLabel;
 		private ProgressBar   _buildingProgressBar;
@@ -162,6 +176,24 @@ namespace Nox.GameBuilder {
 			_buildButton        = root.Q<Button>("build");
 			_selectOutputButton = root.Q<Button>("select-output");
 			_platformEnum       = root.Q<EnumField>("platform");
+
+			_optDevelopment   = root.Q<Toggle>("opt-development");
+			_optAllowDebugging = root.Q<Toggle>("opt-allow-debugging");
+			_optProfiler      = root.Q<Toggle>("opt-profiler");
+			_optScriptsOnly   = root.Q<Toggle>("opt-scripts-only");
+			_optDeepProfiling = root.Q<Toggle>("opt-deep-profiling");
+
+			_optDevelopment.SetValueWithoutNotify(BuilderPanel.OptDevelopment);
+			_optAllowDebugging.SetValueWithoutNotify(BuilderPanel.OptAllowDebugging);
+			_optProfiler.SetValueWithoutNotify(BuilderPanel.OptProfiler);
+			_optScriptsOnly.SetValueWithoutNotify(BuilderPanel.OptScriptsOnly);
+			_optDeepProfiling.SetValueWithoutNotify(BuilderPanel.OptDeepProfiling);
+
+			_optDevelopment.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptDevelopment      = e.newValue);
+			_optAllowDebugging.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptAllowDebugging = e.newValue);
+			_optProfiler.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptProfiler            = e.newValue);
+			_optScriptsOnly.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptScriptsOnly      = e.newValue);
+			_optDeepProfiling.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptDeepProfiling  = e.newValue);
 
 			_buildingContainer   = root.Q<VisualElement>("building");
 			_buildingStatusLabel = _buildingContainer.Q<Label>("status");
