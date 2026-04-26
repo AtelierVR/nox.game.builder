@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "Nox.CCK",
-        "UniTask"
+        "UniTask",
+        "Nox.ModLoader"
     ],
     "includePlatforms": [
         "Editor"
