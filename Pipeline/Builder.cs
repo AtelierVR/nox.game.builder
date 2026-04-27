@@ -246,8 +246,12 @@ namespace Nox.GameBuilder.Pipeline {
 					foreach (var mod in mods) {
 						var path = mod.GetData("folder", "");
 						if (string.IsNullOrEmpty(path)) continue;
-						var t = Path.Combine(path, "buildscenes");
-						if (!Directory.Exists(t)) continue;
+						// Case-insensitive lookup to support both Linux and Windows
+						var t = Directory.Exists(path)
+							? Directory.GetDirectories(path)
+								.FirstOrDefault(d => string.Equals(Path.GetFileName(d), "BuildScenes", StringComparison.OrdinalIgnoreCase))
+							: null;
+						if (string.IsNullOrEmpty(t)) continue;
 						Logger.LogDebug($"Searching for scenes: {t}");
 						var files = Directory.GetFiles(t, "*.unity", SearchOption.AllDirectories)
 							.Select(GetPath)
@@ -271,12 +275,13 @@ namespace Nox.GameBuilder.Pipeline {
 				.Where(m => m.GetModType() == "kernel")
 				.ToArray();
 
-		private static string GetPath(string path)
-			=> string.IsNullOrEmpty(path)
-				? null
-				: Path.Combine("Assets", Path.GetRelativePath(Application.dataPath, path))
-					.Replace("\\", "/")
-					.ToLower()
-					.Replace("assets/../", "");
+		private static string GetPath(string path) {
+			if (string.IsNullOrEmpty(path)) return null;
+			var fullPath    = Path.GetFullPath(path).Replace('\\', '/');
+			var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).Replace('\\', '/').TrimEnd('/') + "/";
+			if (!fullPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+				return null;
+			return fullPath[projectRoot.Length..];
+		}
 	}
 }

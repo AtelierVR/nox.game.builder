@@ -28,9 +28,14 @@ namespace Nox.GameBuilder.Pipeline {
 
 		private static async UniTaskVoid RunBuildAsync() {
 			try {
-				var args           = Environment.GetCommandLineArgs();
-				var output         = GetArg(args, "-customBuildPath") ?? "build";
-				var buildName      = GetArg(args, "-customBuildName") ?? Application.productName;
+				var args            = Environment.GetCommandLineArgs();
+				// game-ci passes -customBuildPath as a full file path (dir/file.exe);
+				// Builder.Build() expects a directory, so extract the parent directory.
+				var customBuildPath = GetArg(args, "-customBuildPath");
+				var output          = string.IsNullOrEmpty(customBuildPath)
+					? "build"
+					: Path.GetDirectoryName(customBuildPath) ?? "build";
+				var buildName       = GetArg(args, "-customBuildName") ?? Application.productName;
 				var platform       = PlatformExtensions.CurrentPlatform;
 				var releaseVersion = GetArg(args, "-noxReleaseVersion");
 				var releaseChannel = GetArg(args, "-noxReleaseChannel");
