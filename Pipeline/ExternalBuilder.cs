@@ -14,8 +14,10 @@ namespace Nox.GameBuilder.Pipeline {
 	///
 	/// game.ci unity-builder automatically passes:
 	///   -buildTarget      &lt;StandaloneWindows64 | StandaloneLinux64 | ...&gt;
-	///   -customBuildPath  &lt;output directory&gt;
 	///   -customBuildName  &lt;executable name&gt;
+	///
+	/// Pass additionally:
+	///   -noxOutputPath    &lt;output directory&gt;  (always a folder; result: dir/name.ext)
 	/// </summary>
 	public static class ExternalBuilder {
 		/// <summary>
@@ -30,15 +32,8 @@ namespace Nox.GameBuilder.Pipeline {
 		private static async UniTaskVoid RunBuildAsync() {
 			try {
 				var args            = Environment.GetCommandLineArgs();
-				// -customBuildPath can be either a full file path (game-ci: dir/file.exe)
-				// or a plain directory (manual usage). If it has a file extension, treat it
-				// as a file path and extract the parent directory; otherwise use it as-is.
-				var customBuildPath = GetArg(args, "-customBuildPath");
-				var output          = string.IsNullOrEmpty(customBuildPath)
-					? "build"
-					: !string.IsNullOrEmpty(Path.GetExtension(customBuildPath))
-						? Path.GetDirectoryName(customBuildPath) ?? "build"
-						: customBuildPath;
+				// -noxOutputPath is always a directory; Builder appends BuildName + extension.
+				var output = GetArg(args, "-noxOutputPath") ?? "build";
 				var buildName       = GetArg(args, "-customBuildName") ?? Application.productName;
 				var platform       = PlatformExtensions.CurrentPlatform;
 				var releaseVersion = GetArg(args, "-noxReleaseVersion");
