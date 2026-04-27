@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using Nox.ModLoader;
@@ -29,12 +30,15 @@ namespace Nox.GameBuilder.Pipeline {
 		private static async UniTaskVoid RunBuildAsync() {
 			try {
 				var args            = Environment.GetCommandLineArgs();
-				// game-ci passes -customBuildPath as a full file path (dir/file.exe);
-				// Builder.Build() expects a directory, so extract the parent directory.
+				// -customBuildPath can be either a full file path (game-ci: dir/file.exe)
+				// or a plain directory (manual usage). If it has a file extension, treat it
+				// as a file path and extract the parent directory; otherwise use it as-is.
 				var customBuildPath = GetArg(args, "-customBuildPath");
 				var output          = string.IsNullOrEmpty(customBuildPath)
 					? "build"
-					: Path.GetDirectoryName(customBuildPath) ?? "build";
+					: !string.IsNullOrEmpty(Path.GetExtension(customBuildPath))
+						? Path.GetDirectoryName(customBuildPath) ?? "build"
+						: customBuildPath;
 				var buildName       = GetArg(args, "-customBuildName") ?? Application.productName;
 				var platform       = PlatformExtensions.CurrentPlatform;
 				var releaseVersion = GetArg(args, "-noxReleaseVersion");
