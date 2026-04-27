@@ -22,41 +22,58 @@ namespace Nox.GameBuilder.Pipeline {
 		/// Kicks off the async build and lets the Unity event loop process it.
 		/// Do NOT pass -quit to Unity; this method calls EditorApplication.Exit itself.
 		/// </summary>
-		public static void Build() {
-			RunBuildAsync().Forget();
-		}
+		public static void Build() 
+			=> RunBuildAsync().Forget();
+		
 
 		private static async UniTaskVoid RunBuildAsync() {
 			try {
-				var args      = Environment.GetCommandLineArgs();
-				var output    = GetArg(args, "-customBuildPath") ?? "build";
-				var buildName = GetArg(args, "-customBuildName") ?? Application.productName;
-				var platform  = PlatformExtensions.CurrentPlatform;
+				var args           = Environment.GetCommandLineArgs();
+				var output         = GetArg(args, "-customBuildPath") ?? "build";
+				var buildName      = GetArg(args, "-customBuildName") ?? Application.productName;
+				var platform       = PlatformExtensions.CurrentPlatform;
+				var releaseVersion = GetArg(args, "-noxReleaseVersion");
+				var releaseChannel = GetArg(args, "-noxReleaseChannel");
 
-				Logger.Log($"[ExternalBuilder] platform={platform.GetPlatformName()}, output={output}, name={buildName}");
+				var debug = string.Join("\n", new[] {
+					$"  platform       = {platform.GetPlatformName()}",
+					$"  output         = {output}",
+					$"  buildName      = {buildName}",
+					$"  releaseVersion = {releaseVersion ?? "(not set)"}",
+					$"  releaseChannel = {releaseChannel ?? "(not set)"}",
+					$"  args           = {string.Join(" ", args)}"
+				});
+
+				Logger.Log($"Starting external build with parameters:\n{debug}", tag: nameof(ExternalBuilder));
+
+				// Apply release version to PlayerSettings so it is embedded in the binary
+				if (!string.IsNullOrEmpty(releaseVersion))
+					PlayerSettings.bundleVersion = releaseVersion;
 
 				// Discover and load all mods (kernel mods will be filtered inside Builder)
 				await ModManager.LoadMods();
 
 				var data = new BuildData {
-					OutputPath       = output,
-					BuildName        = buildName,
-					Target           = platform,
-					Mods             = ModManager.GetMods(),
-					ProgressCallback = (p, m) => Logger.Log($"[ExternalBuilder] {p * 100f:0}% – {m}")
+					OutputPath = output,
+					BuildName  = buildName,
+					Target     = platform,
+					Mods       = ModManager.GetMods(),
+					Version    = releaseVersion,
+					Channel    = releaseChannel,
+					ProgressCallback = (p, m) => Logger.Log($"{p * 100f:0}% – {m}", tag: nameof(ExternalBuilder))
 				};
 
 				var result = await Builder.Build(data);
 
 				if (result.IsFailed) {
-					Logger.LogError($"[ExternalBuilder] Build failed: {result.Message}");
+					Logger.LogError($"Build failed: {result.Message}", tag: nameof(ExternalBuilder));
 					EditorApplication.Exit(1);
 				} else {
-					Logger.Log($"[ExternalBuilder] Build succeeded: {result.Output}");
+					Logger.Log($"Build succeeded: {result.Output}", tag: nameof(ExternalBuilder));
 					EditorApplication.Exit(0);
 				}
 			} catch (Exception e) {
-				Logger.LogError($"[ExternalBuilder] Unexpected error: {e}");
+				Logger.LogError($"Unexpected error: {e}", tag: nameof(ExternalBuilder));
 				EditorApplication.Exit(1);
 			}
 		}
