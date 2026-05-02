@@ -121,9 +121,18 @@ namespace Nox.GameBuilder.Pipeline {
 				};
 
 				data.ProgressCallback(0.3f, "Starting Unity build...");
-				await UniTask.Yield();
 
-				var report  = BuildPipeline.BuildPlayer(buildPlayerOptions);
+				// BuildPipeline.BuildPlayer cannot be called from within the player loop.
+				// Schedule it via delayCall to ensure it runs outside the player loop.
+				var buildTcs = new UniTaskCompletionSource<UnityEditor.Build.Reporting.BuildReport>();
+				EditorApplication.delayCall += () => {
+					try {
+						buildTcs.TrySetResult(BuildPipeline.BuildPlayer(buildPlayerOptions));
+					} catch (Exception ex) {
+						buildTcs.TrySetException(ex);
+					}
+				};
+				var report = await buildTcs.Task;
 				var summary = report.summary;
 
 				if (summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
