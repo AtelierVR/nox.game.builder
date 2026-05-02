@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using Nox.ModLoader;
@@ -20,21 +19,54 @@ namespace Nox.GameBuilder.Pipeline {
 	///   -noxOutputPath    &lt;output directory&gt;  (always a folder; result: dir/name.ext)
 	/// </summary>
 	public static class ExternalBuilder {
+		private const string KeyRequested = "Nox.ExternalBuilder.Requested";
+		private const string KeyRunning   = "Nox.ExternalBuilder.Running";
+		private const string KeyDone      = "Nox.ExternalBuilder.Done";
+
 		/// <summary>
-		/// Synchronous entry point called by Unity (-executeMethod).
-		/// Kicks off the async build and lets the Unity event loop process it.
-		/// Do NOT pass -quit to Unity; this method calls EditorApplication.Exit itself.
+		/// Called by Unity's -executeMethod mechanism.
+		/// Marks this session as a build job so that OnAfterDomainReload can
+		/// (re-)schedule the build after every subsequent domain reload.
 		/// </summary>
-		public static void Build() 
-			=> RunBuildAsync().Forget();
-		
+		public static void Build() {
+			SessionState.SetBool(KeyRequested, true);
+			EditorApplication.delayCall += StartBuild;
+		}
+
+		/// <summary>
+		/// Called automatically after every domain reload.
+		/// If Build() was invoked earlier this session, re-schedules the build
+		/// (any in-flight async task was destroyed by the reload).
+		/// </summary>
+		[InitializeOnLoadMethod]
+		static void OnAfterDomainReload() {
+			if (!SessionState.GetBool(KeyRequested, false)) return;
+			if (SessionState.GetBool(KeyDone, false)) return;
+
+			// A domain reload destroyed any in-flight async task — allow a fresh start.
+			SessionState.SetBool(KeyRunning, false);
+
+			EditorApplication.delayCall += StartBuild;
+		}
+
+		static void StartBuild() {
+			// Guard: only one concurrent async task at a time.
+			if (SessionState.GetBool(KeyRunning, false)) return;
+			SessionState.SetBool(KeyRunning, true);
+			RunBuildAsync().Forget();
+		}
 
 		private static async UniTaskVoid RunBuildAsync() {
 			try {
+				// One frame yield to let any remaining deferred calls flush
+				await UniTask.NextFrame();
+
 				var args            = Environment.GetCommandLineArgs();
 				// -noxOutputPath is always a directory; Builder appends BuildName + extension.
-				var output = GetArg(args, "-noxOutputPath") ?? "build";
-				var buildName       = GetArg(args, "-customBuildName") ?? Application.productName;
+				var output      = GetArg(args, "-noxOutputPath") ?? "build";
+				// Use -noxBuildName if provided, otherwise fall back to productName.
+				// We intentionally ignore -customBuildName (set by game-ci to the target platform name).
+				var buildName   = GetArg(args, "-noxBuildName") ?? Application.productName;
 				var platform       = PlatformExtensions.CurrentPlatform;
 				var releaseVersion = GetArg(args, "-noxReleaseVersion");
 				var releaseChannel = GetArg(args, "-noxReleaseChannel");
@@ -50,17 +82,25 @@ namespace Nox.GameBuilder.Pipeline {
 
 				Logger.Log($"Starting external build with parameters:\n{debug}", tag: nameof(ExternalBuilder));
 
-				// Apply release version to PlayerSettings so it is embedded in the binary
-				if (!string.IsNullOrEmpty(releaseVersion))
+				// Apply release version to PlayerSettings only if it actually changed.
+				// Setting bundleVersion always marks ProjectSettings dirty, which causes
+				// Unity to force a synchronous recompile (→ domain reload) inside
+				// BuildPipeline.BuildPlayer, destroying our async state machine.
+				if (!string.IsNullOrEmpty(releaseVersion) && PlayerSettings.bundleVersion != releaseVersion)
 					PlayerSettings.bundleVersion = releaseVersion;
 
 				// Discover and load all mods (kernel mods will be filtered inside Builder)
 				await ModManager.LoadMods();
 
+				var flags = BuildFlags.None;
+				if (Array.IndexOf(args, "-noxAutoConfirmClearOutput") >= 0)
+					flags |= BuildFlags.AutoConfirmClearOutput;
+
 				var data = new BuildData {
 					OutputPath = output,
 					BuildName  = buildName,
 					Target     = platform,
+					Flags      = flags,
 					Mods       = ModManager.GetMods(),
 					Version    = releaseVersion,
 					Channel    = releaseChannel,
@@ -71,14 +111,19 @@ namespace Nox.GameBuilder.Pipeline {
 
 				if (result.IsFailed) {
 					Logger.LogError($"Build failed: {result.Message}", tag: nameof(ExternalBuilder));
+					SessionState.SetBool(KeyDone, true);
 					EditorApplication.Exit(1);
 				} else {
 					Logger.Log($"Build succeeded: {result.Output}", tag: nameof(ExternalBuilder));
+					SessionState.SetBool(KeyDone, true);
 					EditorApplication.Exit(0);
 				}
 			} catch (Exception e) {
 				Logger.LogError($"Unexpected error: {e}", tag: nameof(ExternalBuilder));
+				SessionState.SetBool(KeyDone, true);
 				EditorApplication.Exit(1);
+			} finally {
+				SessionState.SetBool(KeyRunning, false);
 			}
 		}
 

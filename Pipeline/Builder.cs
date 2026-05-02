@@ -109,8 +109,7 @@ namespace Nox.GameBuilder.Pipeline {
 				if (File.Exists(data.OutputPath))
 					File.Delete(data.OutputPath);
 
-				if (!Directory.Exists(data.OutputPath))
-					Directory.CreateDirectory(data.OutputPath);
+				PrepareOutputDirectory(data);
 
 				var scenes = GetScenesToBuild(data.Mods);
 
@@ -274,6 +273,45 @@ namespace Nox.GameBuilder.Pipeline {
 			=> mods
 				.Where(m => m.GetModType() == "kernel")
 				.ToArray();
+
+		private static void PrepareOutputDirectory(BuildData data) {
+			if (!Directory.Exists(data.OutputPath)) {
+				Directory.CreateDirectory(data.OutputPath);
+				return;
+			}
+
+			if (IsOutputEmpty(data.OutputPath) || AllowClearOutput(data)) {
+				if (!IsOutputEmpty(data.OutputPath)) {
+					Directory.Delete(data.OutputPath, true);
+					Directory.CreateDirectory(data.OutputPath);
+				}
+				return;
+			}
+
+			throw new InvalidOperationException(
+				$"Output folder is not empty: {data.OutputPath}. " +
+				"Pass BuildFlags.AutoConfirmClearOutput or clear the folder manually."
+			);
+		}
+
+		private static bool IsOutputEmpty(string path)
+			=> Directory.GetFileSystemEntries(path).Length == 0;
+
+		private static bool AllowClearOutput(BuildData data) {
+			if ((data.Flags & BuildFlags.AutoConfirmClearOutput) != 0)
+				return true;
+
+			// Batch mode has no UI — cannot ask.
+			if (Application.isBatchMode)
+				return false;
+
+			return Logger.OpenDialog(
+				"Output folder is not empty",
+				$"The output folder already contains files:\n{data.OutputPath}\n\nClear it before building?",
+				"Yes, clear it",
+				"No, cancel"
+			);
+		}
 
 		private static string GetPath(string path) {
 			if (string.IsNullOrEmpty(path)) return null;
