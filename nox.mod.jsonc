@@ -22,15 +22,9 @@
       "website": "https://hactazia.fr/"
     }
   ],
-  "contributors": [],
-  "relations": [
-  ],
   "entrypoints": {
     "editor": [
       "Nox.GameBuilder.BuilderPanel"
     ]
-  },
-  "references": [],
-  
-  "permissions": []
+  }
 }
