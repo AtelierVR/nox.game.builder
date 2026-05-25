@@ -1,5 +1,6 @@
-{
-  "name": "nox.game.builder",
-  "displayName": "Nox - Game Builder",
-  "version": "1.0.0"
+﻿{
+    "name":  "nox.game.builder",
+    "displayName":  "Nox - Game Builder",
+    "version":  "1.0.0",
+    "description":  "Game mode builder and configuration system for creating custom in-world game modes."
 }
