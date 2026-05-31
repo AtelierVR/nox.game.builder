@@ -225,7 +225,7 @@ namespace Nox.GameBuilder.Pipeline {
 					}
 				);
 			} catch (Exception e) {
-				Logger.LogError($"Build failed: {e}");
+				Logger.LogError(e);
 				return Finish(
 					new BuildResult {
 						Type    = BuildResultType.Failed,
