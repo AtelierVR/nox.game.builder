@@ -1,16 +1,26 @@
 {
   "type": "library",
   "id": "nox.game.builder",
-  "registers": {
-    "nox.cck": "git+https://github.com/AtelierVR/nox.cck.git",
-    "nox.editor": "git+https://github.com/AtelierVR/nox.editor.git",
-    "nox.editor.panel": "git+https://github.com/AtelierVR/nox.editor.panel.git",
-    "com.cysharp.unitask": "git+https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask"
-  },
   "relations": [
-    { "id": "nox.cck", "type": "depends" },
-    { "id": "nox.editor", "type": "depends" },
-    { "id": "nox.editor.panel", "type": "depends" },
-    { "id": "com.cysharp.unitask", "type": "depends" }
+    {
+      "id": "nox.cck",
+      "type": "depends",
+      "register": "git+https://github.com/AtelierVR/nox.cck.git"
+    },
+    {
+      "id": "nox.editor",
+      "type": "depends",
+      "register": "git+https://github.com/AtelierVR/nox.editor.git"
+    },
+    {
+      "id": "nox.editor.panel",
+      "type": "depends",
+      "register": "git+https://github.com/AtelierVR/nox.editor.panel.git"
+    },
+    {
+      "id": "com.cysharp.unitask",
+      "type": "depends",
+      "register": "git+https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask"
+    }
   ]
 }
