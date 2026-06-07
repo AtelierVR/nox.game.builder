@@ -34,6 +34,7 @@ namespace Nox.GameBuilder.Pipeline {
 		/// (re-)schedule the build after every subsequent domain reload.
 		/// </summary>
 		public static void Build() {
+			SessionState.SetBool(KeyDone, false);
 			SessionState.SetBool(KeyRequested, true);
 			EditorApplication.delayCall += StartBuild;
 		}
@@ -46,6 +47,7 @@ namespace Nox.GameBuilder.Pipeline {
 		///        -noxTargetPlatform StandaloneWindows64
 		/// </summary>
 		public static void BuildMod() {
+			SessionState.SetBool(KeyDone, false);
 			SessionState.SetBool(KeyModRequested, true);
 			EditorApplication.delayCall += StartBuildMod;
 		}
