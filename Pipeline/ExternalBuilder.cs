@@ -119,8 +119,7 @@ namespace Nox.GameBuilder.Pipeline {
 				var allMods = ModManager.GetMods();
 
 				// Find the target mod
-				var mod = allMods.FirstOrDefault(m =>
-					m.GetMetadata().GetId().Equals(modId, StringComparison.OrdinalIgnoreCase));
+				var mod = allMods.FirstOrDefault(m => m.GetMetadata().GetId().Equals(modId, StringComparison.OrdinalIgnoreCase));
 
 				if (mod == null) {
 					Logger.LogError($"Mod not found: {modId}. Available: {string.Join(", ", allMods.Select(m => m.GetMetadata().GetId()))}", tag: nameof(ExternalBuilder));
