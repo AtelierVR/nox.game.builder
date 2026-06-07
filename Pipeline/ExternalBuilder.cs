@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using Cysharp.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using Nox.CCK.Utils;
 using Nox.ModLoader;
 using UnityEditor;
@@ -19,9 +23,10 @@ namespace Nox.GameBuilder.Pipeline {
 	///   -noxOutputPath    &lt;output directory&gt;  (always a folder; result: dir/name.ext)
 	/// </summary>
 	public static class ExternalBuilder {
-		private const string KeyRequested = "Nox.ExternalBuilder.Requested";
-		private const string KeyRunning   = "Nox.ExternalBuilder.Running";
-		private const string KeyDone      = "Nox.ExternalBuilder.Done";
+		private const string KeyRequested    = "Nox.ExternalBuilder.Requested";
+		private const string KeyRunning      = "Nox.ExternalBuilder.Running";
+		private const string KeyDone         = "Nox.ExternalBuilder.Done";
+		private const string KeyModRequested = "Nox.ExternalBuilder.ModRequested";
 
 		/// <summary>
 		/// Called by Unity's -executeMethod mechanism.
@@ -34,27 +39,169 @@ namespace Nox.GameBuilder.Pipeline {
 		}
 
 		/// <summary>
+		/// Builds only a single mod (DLLs + AssetBundles), without building the player.
+		/// Usage: -executeMethod Nox.GameBuilder.Pipeline.ExternalBuilder.BuildMod
+		///        -noxModToBuild nox.network
+		///        -noxOutputPath build/nox.network
+		///        -noxTargetPlatform StandaloneWindows64
+		/// </summary>
+		public static void BuildMod() {
+			SessionState.SetBool(KeyModRequested, true);
+			EditorApplication.delayCall += StartBuildMod;
+		}
+
+		/// <summary>
 		/// Called automatically after every domain reload.
-		/// If Build() was invoked earlier this session, re-schedules the build
-		/// (any in-flight async task was destroyed by the reload).
+		/// If Build() or BuildMod() was invoked earlier this session, re-schedules.
 		/// </summary>
 		[InitializeOnLoadMethod]
 		static void OnAfterDomainReload() {
-			if (!SessionState.GetBool(KeyRequested, false)) return;
+			bool isFullBuild = SessionState.GetBool(KeyRequested, false);
+			bool isModBuild  = SessionState.GetBool(KeyModRequested, false);
+
+			if (!isFullBuild && !isModBuild) return;
 			if (SessionState.GetBool(KeyDone, false)) return;
 
 			// A domain reload destroyed any in-flight async task — allow a fresh start.
 			SessionState.SetBool(KeyRunning, false);
 
-			EditorApplication.delayCall += StartBuild;
+			if (isModBuild)
+				EditorApplication.delayCall += StartBuildMod;
+			else
+				EditorApplication.delayCall += StartBuild;
 		}
 
 		static void StartBuild() {
-			// Guard: only one concurrent async task at a time.
 			if (SessionState.GetBool(KeyRunning, false)) return;
 			SessionState.SetBool(KeyRunning, true);
 			RunBuildAsync().Forget();
 		}
+
+		static void StartBuildMod() {
+			if (SessionState.GetBool(KeyRunning, false)) return;
+			SessionState.SetBool(KeyRunning, true);
+			RunBuildModAsync().Forget();
+		}
+
+		// ═══════════════════════════════════════════════════════════════
+		// BuildMod — DLLs + AssetBundles only, no player build
+		// ═══════════════════════════════════════════════════════════════
+
+		private static async UniTaskVoid RunBuildModAsync() {
+			try {
+				await UniTask.NextFrame();
+
+				var args   = Environment.GetCommandLineArgs();
+				var modId  = GetArg(args, "-noxModToBuild");
+				var output = GetArg(args, "-noxOutputPath") ?? "build/mod";
+				var targetStr = GetArg(args, "-noxTargetPlatform") ?? "StandaloneWindows64";
+
+				if (string.IsNullOrEmpty(modId)) {
+					Logger.LogError("Missing -noxModToBuild argument. Usage: -noxModToBuild nox.network", tag: nameof(ExternalBuilder));
+					SessionState.SetBool(KeyDone, true);
+					EditorApplication.Exit(1);
+					return;
+				}
+
+				Logger.Log($"BuildMod: {modId} -> {output} (target: {targetStr})", tag: nameof(ExternalBuilder));
+
+				// Resolve platform
+				var platform = PlatformExtensions.CurrentPlatform;
+				// Override if target specified and differs
+				if (!string.IsNullOrEmpty(targetStr)) {
+					try { platform = (Platform)Enum.Parse(typeof(Platform), targetStr); } catch { }
+				}
+
+				// Load all mods
+				await ModManager.LoadMods();
+				var allMods = ModManager.GetMods();
+
+				// Find the target mod
+				var mod = allMods.FirstOrDefault(m =>
+					m.GetMetadata().GetId().Equals(modId, StringComparison.OrdinalIgnoreCase));
+
+				if (mod == null) {
+					Logger.LogError($"Mod not found: {modId}. Available: {string.Join(", ", allMods.Select(m => m.GetMetadata().GetId()))}", tag: nameof(ExternalBuilder));
+					SessionState.SetBool(KeyDone, true);
+					EditorApplication.Exit(1);
+					return;
+				}
+
+				var meta       = mod.GetMetadata();
+				var modFolder  = mod.GetData<string>("folder");
+
+				Logger.Log($"Found mod: {meta.GetId()} at {modFolder}", tag: nameof(ExternalBuilder));
+
+				// Ensure output directory
+				if (!Directory.Exists(output))
+					Directory.CreateDirectory(output);
+
+				// ── 1. Build AssetBundles ──────────────────────────
+				var assetResults = BuildAssets.BuildAsAssetBundles(new[] { mod }, platform, output);
+
+				if (assetResults != null && assetResults.Length > 0) {
+					Logger.Log($"Built {assetResults.Sum(r => r.outputs.Length)} asset bundle(s)", tag: nameof(ExternalBuilder));
+				} else {
+					Logger.Log("No asset bundles produced (mod may have no assets folder)", tag: nameof(ExternalBuilder));
+				}
+
+				// ── 2. Copy DLLs from Library/ScriptAssemblies/ ────
+				var asmDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
+				var copiedDlls = new List<string>();
+
+				if (Directory.Exists(modFolder)) {
+					var asmdefFiles = Directory.GetFiles(modFolder, "*.asmdef", SearchOption.AllDirectories);
+					foreach (var asmdefFile in asmdefFiles) {
+						try {
+							var json    = JObject.Parse(File.ReadAllText(asmdefFile));
+							var asmName = json["name"]?.Value<string>();
+							if (string.IsNullOrEmpty(asmName)) continue;
+
+							var dllPath = Path.Combine(asmDir, asmName + ".dll");
+							if (!File.Exists(dllPath)) {
+								Logger.LogWarning($"DLL not found: {asmName}.dll", tag: nameof(ExternalBuilder));
+								continue;
+							}
+
+							var destPath = Path.Combine(output, asmName + ".dll");
+							File.Copy(dllPath, destPath, true);
+							copiedDlls.Add(asmName + ".dll");
+							Logger.Log($"  Copied: {asmName}.dll", tag: nameof(ExternalBuilder));
+						} catch (Exception ex) {
+							Logger.LogWarning($"Failed to process asmdef {asmdefFile}: {ex.Message}", tag: nameof(ExternalBuilder));
+						}
+					}
+				}
+
+				// ── 3. Copy mod manifest ──────────────────────────
+				var manifestPath = Path.Combine(modFolder ?? "", "nox.mod.jsonc");
+				if (File.Exists(manifestPath)) {
+					File.Copy(manifestPath, Path.Combine(output, "nox.mod.jsonc"), true);
+					Logger.Log("  Copied: nox.mod.jsonc", tag: nameof(ExternalBuilder));
+				}
+
+				// ── 4. Summary ────────────────────────────────────
+				var bundleCount = assetResults?.Sum(r => r.outputs.Length) ?? 0;
+				Logger.Log($"", tag: nameof(ExternalBuilder));
+				Logger.Log($"══ BuildMod complete: {modId} ══", tag: nameof(ExternalBuilder));
+				Logger.Log($"  Output : {Path.GetFullPath(output)}", tag: nameof(ExternalBuilder));
+				Logger.Log($"  DLLs   : {copiedDlls.Count} ({string.Join(", ", copiedDlls)})", tag: nameof(ExternalBuilder));
+				Logger.Log($"  Bundles: {bundleCount}", tag: nameof(ExternalBuilder));
+
+				SessionState.SetBool(KeyDone, true);
+				EditorApplication.Exit(0);
+			} catch (Exception e) {
+				Logger.LogError($"BuildMod failed: {e}", tag: nameof(ExternalBuilder));
+				SessionState.SetBool(KeyDone, true);
+				EditorApplication.Exit(1);
+			} finally {
+				SessionState.SetBool(KeyRunning, false);
+			}
+		}
+
+		// ═══════════════════════════════════════════════════════════════
+		// Build — full player + mods + asset bundles (existing)
+		// ═══════════════════════════════════════════════════════════════
 
 		private static async UniTaskVoid RunBuildAsync() {
 			try {
