@@ -175,13 +175,29 @@ namespace Nox.GameBuilder.Pipeline {
 				}
 
 				// ── 3. Copy mod manifest ──────────────────────────
-				var manifestPath = Path.Combine(modFolder ?? "", "nox.mod.jsonc");
-				if (File.Exists(manifestPath)) {
-					File.Copy(manifestPath, Path.Combine(output, "nox.mod.jsonc"), true);
-					Logger.Log("  Copied: nox.mod.jsonc", tag: nameof(ExternalBuilder));
+				foreach (var mfName in new[] { "nox.mod.json", "nox.mod.jsonc" }) {
+					var manifestPath = Path.Combine(modFolder ?? "", mfName);
+					if (File.Exists(manifestPath)) {
+						File.Copy(manifestPath, Path.Combine(output, mfName), true);
+						Logger.Log($"  Copied: {mfName}", tag: nameof(ExternalBuilder));
+					}
 				}
 
-				// ── 4. Summary ────────────────────────────────────
+				// ── 4. Copy package.json ─────────────────────────
+				var packageJsonPath = Path.Combine(modFolder ?? "", "package.json");
+				if (File.Exists(packageJsonPath)) {
+					File.Copy(packageJsonPath, Path.Combine(output, "package.json"), true);
+					Logger.Log("  Copied: package.json", tag: nameof(ExternalBuilder));
+				}
+
+				// ── 5. Copy native plugins ────────────────────────
+				var pluginsDir = Path.Combine(modFolder ?? "", "Plugins");
+				if (Directory.Exists(pluginsDir)) {
+					CopyDirectory(pluginsDir, Path.Combine(output, "Plugins"));
+					Logger.Log("  Copied: Plugins/", tag: nameof(ExternalBuilder));
+				}
+
+				// ── 6. Summary ────────────────────────────────────
 				var bundleCount = assetResults?.Sum(r => r.outputs.Length) ?? 0;
 				Logger.Log($"", tag: nameof(ExternalBuilder));
 				Logger.Log($"══ BuildMod complete: {modId} ══", tag: nameof(ExternalBuilder));
@@ -197,6 +213,20 @@ namespace Nox.GameBuilder.Pipeline {
 				EditorApplication.Exit(1);
 			} finally {
 				SessionState.SetBool(KeyRunning, false);
+			}
+		}
+
+		// ═══════════════════════════════════════════════════════════════
+		// Helpers
+		// ═══════════════════════════════════════════════════════════════
+
+		static void CopyDirectory(string sourceDir, string destDir) {
+			Directory.CreateDirectory(destDir);
+			foreach (var file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories)) {
+				var relative = file.Substring(sourceDir.Length + 1);
+				var dest = Path.Combine(destDir, relative);
+				Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+				File.Copy(file, dest, true);
 			}
 		}
 
