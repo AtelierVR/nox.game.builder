@@ -78,6 +78,12 @@ namespace Nox.GameBuilder.Pipeline {
 				// ── 1. Build player (to get platform-correct assemblies) ─
 				data.ProgressCallback(0.1f, "Building player...");
 
+				// Disable managed stripping to avoid UnityLinker crashes in CI
+				var unityTarget = platform.GetBuildTarget();
+				var targetGroup = BuildPipeline.GetBuildTargetGroup(unityTarget);
+				var prevStripping = PlayerSettings.GetManagedStrippingLevel(targetGroup);
+				PlayerSettings.SetManagedStrippingLevel(targetGroup, ManagedStrippingLevel.Disabled);
+
 				var scenes = GameBuild.GetScenesToBuild(allMods.ToArray());
 				Directory.CreateDirectory(playerTemp);
 
@@ -99,6 +105,7 @@ namespace Nox.GameBuilder.Pipeline {
 					}
 				};
 				var report = await buildTcs.Task;
+				PlayerSettings.SetManagedStrippingLevel(targetGroup, prevStripping);
 				if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
 					return Finish(new BuildResult { Type = BuildResultType.Failed, Message = $"Player build failed with {report.summary.totalErrors} errors." });
 
