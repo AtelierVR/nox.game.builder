@@ -14,6 +14,7 @@ using TypedAsset     = Nox.ModLoader.Typing.Asset;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEditor;
+using UnityEditor.Build;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.GameBuilder.Pipeline {
@@ -80,9 +81,9 @@ namespace Nox.GameBuilder.Pipeline {
 
 				// Disable managed stripping to avoid UnityLinker crashes in CI
 				var unityTarget = platform.GetBuildTarget();
-				var targetGroup = BuildPipeline.GetBuildTargetGroup(unityTarget);
-				var prevStripping = PlayerSettings.GetManagedStrippingLevel(targetGroup);
-				PlayerSettings.SetManagedStrippingLevel(targetGroup, ManagedStrippingLevel.Disabled);
+				var namedTarget = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(unityTarget));
+				var prevStripping = PlayerSettings.GetManagedStrippingLevel(namedTarget);
+				PlayerSettings.SetManagedStrippingLevel(namedTarget, ManagedStrippingLevel.Disabled);
 
 				var scenes = GameBuild.GetScenesToBuild(allMods.ToArray());
 				Directory.CreateDirectory(playerTemp);
@@ -105,7 +106,7 @@ namespace Nox.GameBuilder.Pipeline {
 					}
 				};
 				var report = await buildTcs.Task;
-				PlayerSettings.SetManagedStrippingLevel(targetGroup, prevStripping);
+				PlayerSettings.SetManagedStrippingLevel(namedTarget, prevStripping);
 				if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
 					return Finish(new BuildResult { Type = BuildResultType.Failed, Message = $"Player build failed with {report.summary.totalErrors} errors." });
 
