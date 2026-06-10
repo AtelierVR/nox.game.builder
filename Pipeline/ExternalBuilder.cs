@@ -106,6 +106,9 @@ namespace Nox.GameBuilder.Pipeline {
 				if (!string.IsNullOrEmpty(targetStr))
 					try { platform = (Platform)Enum.Parse(typeof(Platform), targetStr); } catch { }
 
+				// Discover and load all mods so ModManager.Mods is populated
+				await ModManager.LoadMods();
+
 				var data = new ModBuildData {
 					ModIds     = modId.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToArray(),
 					OutputPath = output,
