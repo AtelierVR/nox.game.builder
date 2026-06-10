@@ -78,7 +78,7 @@ namespace Nox.GameBuilder.Pipeline {
 				// ── 1. Build player (to get platform-correct assemblies) ─
 				data.ProgressCallback(0.1f, "Building player...");
 
-				var scenes = GameBuild.GetScenesToBuild(GameBuild.GetKernelMods(allMods.ToArray()));
+				var scenes = GameBuild.GetScenesToBuild(allMods.ToArray());
 				Directory.CreateDirectory(playerTemp);
 
 				var playerName = Application.productName;
