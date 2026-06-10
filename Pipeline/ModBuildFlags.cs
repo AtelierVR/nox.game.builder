@@ -2,7 +2,7 @@ using System;
 
 namespace Nox.GameBuilder.Pipeline {
 	[Flags]
-	public enum BuildFlags {
+	public enum ModBuildFlags {
 		None                  = 0,
 		/// <summary>
 		/// Delete and recreate the output directory before building if it is not empty.

@@ -75,18 +75,11 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 # Remove Temps from Nox
-/[Aa]ssets/*[Bb]uild*/
 /[Aa]ssets/link.xml
 /[Aa]ssets/link.xml.meta
 /[Pp]roject[Ss]ettings/EditorBuildSettings.asset
 /[Pp]ackages/*
 !/[Pp]ackages/manifest.json
-!/[Pp]ackages/*nox.*/
-!/[Pp]ackages/hactazia.*/
-/[Pp]ackages/*nox.*/link.xml
-/[Pp]ackages/*nox.*/link.xml.meta
-/[Pp]ackages/*hactazia.*/link.xml
-/[Pp]ackages/*hactazia.*/link.xml.meta
 /[Aa]ssets/[Tt]emp/
 /[Aa]ssets/[Aa]uto[Hh]and/
 /[Aa]ssets/[Pp]olygonmaker/

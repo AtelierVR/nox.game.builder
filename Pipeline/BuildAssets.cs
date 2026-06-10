@@ -5,33 +5,13 @@ using System.IO;
 using System.Linq;
 using Nox.CCK.Mods;
 using Nox.CCK.Utils;
+using Nox.GameBuilder.Pipeline.Utils;
 using UnityEditor;
 using UnityEngine;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.GameBuilder.Pipeline {
 	public class BuildAssets {
-		private static string GetAssetPath(string filePath) {
-			// Normaliser le chemin
-			filePath = Path.GetFullPath(filePath).Replace('\\', '/');
-
-			// Vérifier si le fichier est dans le dossier Assets
-			var assetsPath = Path.GetFullPath(Application.dataPath).Replace('\\', '/');
-			if (filePath.StartsWith(assetsPath)) {
-				return "Assets" + filePath.Substring(assetsPath.Length);
-			}
-
-			// Vérifier si le fichier est dans un package
-			var packagesPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages")).Replace('\\', '/');
-			if (filePath.StartsWith(packagesPath)) {
-				return "Packages" + filePath.Substring(packagesPath.Length);
-			}
-
-			// Si le chemin n'est ni dans Assets ni dans Packages, on ne peut pas l'utiliser
-			Logger.LogWarning($"Asset path not supported: {filePath}");
-			return null;
-		}
-
 		public static AssetBundleBuildResult[] BuildAsAssetBundles(IMod[] mod, Platform target, string outputfolder) {
 			if (!target.IsSupported()) {
 				Logger.LogError("Unsupported platform: " + target.GetPlatformName());
@@ -50,18 +30,18 @@ namespace Nox.GameBuilder.Pipeline {
 				Logger.Log("Building asset bundles for: " + buildname);
 
 				var scenes = Directory.GetFiles(assetfolder, "*.unity", SearchOption.AllDirectories)
-					.Select(f => GetAssetPath(f))
+					.Select(f => PathUtils.ToAssetPath(f))
 					.Where(p => !string.IsNullOrEmpty(p))
 					.ToArray();
 
 				var scriptables = Directory.GetFiles(assetfolder, "*.asset", SearchOption.AllDirectories)
-					.Select(f => GetAssetPath(f))
+					.Select(f => PathUtils.ToAssetPath(f))
 					.Where(p => !string.IsNullOrEmpty(p))
 					.ToArray();
 
 				var assets = Directory.GetFiles(assetfolder, "*.*", SearchOption.AllDirectories)
 					.Where(f => !f.EndsWith(".meta") && !f.EndsWith(".unity") && !f.EndsWith(".asset") && !f.EndsWith(".cs") && !f.EndsWith(".blend1") && !f.EndsWith(".cginc") && !f.EndsWith(".hlsl") && !f.EndsWith(".svg"))
-					.Select(f => GetAssetPath(f))
+					.Select(f => PathUtils.ToAssetPath(f))
 					.Where(p => !string.IsNullOrEmpty(p))
 					.ToArray();
 

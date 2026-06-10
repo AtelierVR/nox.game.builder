@@ -1,0 +1,28 @@
+.mod-item {
+    border-width: var(--border-width);
+    border-radius: var(--boder-radius);
+    padding: var(--padding-medium);
+    margin: var(--margin-small);
+    flex-direction: row;
+}
+
+.mod-item .icon {
+    width: 24px;
+    height: 24px;
+    margin-right: var(--margin-medium);
+    border-radius: var(--boder-radius);
+}
+
+.mod-item .id {
+    margin-bottom: var(--margin-small);
+}
+
+.mod-item .name {
+    font-weight: bold;
+}
+
+.mod-item .icon-container {
+    justify-content: center;
+}
+
+

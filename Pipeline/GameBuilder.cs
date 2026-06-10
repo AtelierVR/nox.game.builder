@@ -13,14 +13,14 @@ using UnityEngine.Events;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.GameBuilder.Pipeline {
-	public static class Builder {
+	public static class GameBuild {
 		public static bool IsBuilding;
 
 		public static readonly UnityEvent<float, string> OnBuildProgress = new();
 		public static readonly UnityEvent<BuildResult>   OnBuildFinished = new();
-		public static readonly UnityEvent<BuildData>     OnBuildStarted  = new();
+		public static readonly UnityEvent<GameBuildData>     OnBuildStarted  = new();
 
-		public static async UniTask<BuildResult> Build(BuildData data) {
+		public static async UniTask<BuildResult> Build(GameBuildData data) {
 			// Wrap user progress callback to also emit UnityEvent
 			var userProgress = data.ProgressCallback;
 			data.ProgressCallback = (p, m) => {
@@ -121,9 +121,17 @@ namespace Nox.GameBuilder.Pipeline {
 				};
 
 				data.ProgressCallback(0.3f, "Starting Unity build...");
-				await UniTask.Yield();
 
-				var report  = BuildPipeline.BuildPlayer(buildPlayerOptions);
+				var buildTcs = new UniTaskCompletionSource<UnityEditor.Build.Reporting.BuildReport>();
+				EditorApplication.delayCall += () => {
+					try {
+						var r = BuildPipeline.BuildPlayer(buildPlayerOptions);
+						buildTcs.TrySetResult(r);
+					} catch (Exception ex) {
+						buildTcs.TrySetException(ex);
+					}
+				};
+				var report  = await buildTcs.Task;
 				var summary = report.summary;
 
 				if (summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
@@ -208,7 +216,7 @@ namespace Nox.GameBuilder.Pipeline {
 						gameData, new JObject {
 							["mods"] = m,
 							["engine"] = new JObject {
-								["name"]    = EngineExtensions.CurrentEngine.ToString(),
+								["name"]    = EngineExtensions.CurrentEngine.GetEngineName(),
 								["version"] = EngineExtensions.CurrentVersion.ToString()
 							},
 							["platform"] = data.Target.GetPlatformName()
@@ -274,7 +282,7 @@ namespace Nox.GameBuilder.Pipeline {
 				.Where(m => m.GetModType() == "kernel")
 				.ToArray();
 
-		private static void PrepareOutputDirectory(BuildData data) {
+		private static void PrepareOutputDirectory(GameBuildData data) {
 			if (!Directory.Exists(data.OutputPath)) {
 				Directory.CreateDirectory(data.OutputPath);
 				return;
@@ -297,8 +305,8 @@ namespace Nox.GameBuilder.Pipeline {
 		private static bool IsOutputEmpty(string path)
 			=> Directory.GetFileSystemEntries(path).Length == 0;
 
-		private static bool AllowClearOutput(BuildData data) {
-			if ((data.Flags & BuildFlags.AutoConfirmClearOutput) != 0)
+		private static bool AllowClearOutput(GameBuildData data) {
+			if ((data.Flags & GameBuildFlags.AutoConfirmClearOutput) != 0)
 				return true;
 
 			// Batch mode has no UI — cannot ask.

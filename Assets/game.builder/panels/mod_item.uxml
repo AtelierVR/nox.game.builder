@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style"/>
+    <Style src="project://database/Packages/nox.game.builder/Assets/game.builder/panels/style.uss?fileID=7433441132597879392&amp;guid=576bd220684cd3f44ac74a166ec2f6f4&amp;type=3#style"/>
+    <ui:VisualElement class="mod-item bg-secondary">
+        <ui:VisualElement class="icon-container">
+            <ui:Image name="icon" class="icon"/>
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-grow: 1; justify-content: center;">
+            <ui:Label name="id" text="mod.id" class="text-xs id" style="-unity-text-align: middle-left;"/>
+            <ui:Label name="name" text="Mod Name" class="name px-8" style="-unity-text-align: middle-left;"/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

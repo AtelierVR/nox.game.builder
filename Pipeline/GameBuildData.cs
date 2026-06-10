@@ -4,12 +4,12 @@ using Nox.CCK.Utils;
 using UnityEditor;
 
 namespace Nox.GameBuilder.Pipeline {
-	public class BuildData {
+	public class GameBuildData {
 		public string                OutputPath;
 		public Platform              Target;
 		public string                BuildName;
 		public BuildOptions          BuildOptions = BuildOptions.None;
-		public BuildFlags            Flags        = BuildFlags.None;
+		public GameBuildFlags            Flags        = GameBuildFlags.None;
 		public IMod[]                Mods;
 		public Action<float, string> ProgressCallback = (_, _) => { };
 		/// <summary>Release version string (e.g. "26.18.1-indev-9"), passed via -noxReleaseVersion.</summary>

@@ -1,0 +1,57 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements"
+         xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd"
+         editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style"/>
+    <Style src="project://database/Packages/nox.game.builder/Assets/game.builder/panels/style.uss?fileID=7433441132597879392&amp;guid=576bd220684cd3f44ac74a166ec2f6f4&amp;type=3#style"/>
+    <ui:VisualElement style="flex-grow: 1;">
+        <ui:ScrollView style="flex-grow: 1; min-height: 0;">
+            <ui:GroupBox class="p-8 py-16 m-0">
+                <ui:VisualElement style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <ui:Label text="Select Mods to Build" class="text-lg"/>
+                    <ui:VisualElement style="flex-direction: row;">
+                        <ui:Button text="All" name="select-all" class="small" style="margin-right: 4px;"/>
+                        <ui:Button text="None" name="deselect-all" class="small"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="mods-list"/>
+            </ui:GroupBox>
+        </ui:ScrollView>
+        <ui:GroupBox class="m-0 border-t pb-16 p-8">
+            <ui:VisualElement style="flex-grow: 1; flex-direction: row;">
+                <ui:TextField placeholder-text="Build/Mods" name="output" class="large" style="flex-grow: 1;"/>
+                <ui:Button text="Select" name="select-output" class="large" style="min-width: 64px;"/>
+                <ui:Button text="Open" name="open-output" class="large" style="min-width: 64px;"/>
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-grow: 1; flex-direction: row; margin-top: 4px;">
+                <ui:EnumField value="None" type="Nox.CCK.Utils.Platform, Nox.CCK" name="platform" class="large"
+                              style="flex-grow: 1;"/>
+                <ui:Button text="Build Mod" name="build" class="large" style="min-width: 134px;"/>
+            </ui:VisualElement>
+        </ui:GroupBox>
+        <ui:GroupBox name="building" class="m-0 p-0 bg-modal"
+                     style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: none;">
+            <ui:VisualElement style="flex-grow: 1;"/>
+            <ui:VisualElement class="bg-default p-8 pb-16 border-t rounded-t-lg">
+                <ui:VisualElement class="border-b mb-8 pb-8">
+                    <ui:Label text="Building Mod" style="-unity-text-align: upper-center; font-size: 18px;"/>
+                </ui:VisualElement>
+                <ui:Label text="Label" name="status" class="margin-x my-16"/>
+                <ui:ProgressBar value="0" name="progress" class="large p-0 m-0 margin"/>
+            </ui:VisualElement>
+        </ui:GroupBox>
+        <ui:GroupBox name="result" class="m-0 p-0 bg-modal"
+                     style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: none;">
+            <ui:VisualElement style="flex-grow: 1;"/>
+            <ui:VisualElement class="p-8 pb-16 border-t rounded-t-lg bg-default">
+                <ui:VisualElement class="border-b mb-8 pb-8">
+                    <ui:Label text="Success" name="success"
+                              style="color: rgb(0, 255, 0); -unity-text-align: upper-center; font-size: 18px;"/>
+                    <ui:Label text="Failed" name="failed"
+                              style="color: rgb(255, 0, 0); -unity-text-align: upper-center; font-size: 18px;"/>
+                </ui:VisualElement>
+                <ui:Label text="Label" name="details" class="margin-x my-16"/>
+                <ui:Button text="OK" name="ok" class="large"/>
+            </ui:VisualElement>
+        </ui:GroupBox>
+    </ui:VisualElement>
+</ui:UXML>

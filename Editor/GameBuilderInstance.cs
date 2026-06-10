@@ -15,16 +15,16 @@ using IPanel = Nox.Editor.Panel.IPanel;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.GameBuilder {
-	public class BuilderInstance : IInstance {
-		private readonly BuilderPanel _panel;
+	public class GameBuilderInstance : IInstance {
+		private readonly GameBuilderPanel _panel;
 		private readonly IWindow      _window;
 
-		public BuilderInstance(BuilderPanel panel, IWindow window, Dictionary<string, object> data) {
+		public GameBuilderInstance(GameBuilderPanel panel, IWindow window, Dictionary<string, object> data) {
 			_panel  = panel;
 			_window = window;
-			Builder.OnBuildFinished.AddListener(OnBuildFinished);
-			Builder.OnBuildStarted.AddListener(OnBuildStarted);
-			Builder.OnBuildProgress.AddListener(OnBuildProgress);
+			GameBuild.OnBuildFinished.AddListener(OnBuildFinished);
+			GameBuild.OnBuildStarted.AddListener(OnBuildStarted);
+			GameBuild.OnBuildProgress.AddListener(OnBuildProgress);
 		}
 
 
@@ -38,9 +38,9 @@ namespace Nox.GameBuilder {
 			=> "Game Builder";
 
 		public void OnDestroy() {
-			Builder.OnBuildFinished.RemoveListener(OnBuildFinished);
-			Builder.OnBuildStarted.RemoveListener(OnBuildStarted);
-			Builder.OnBuildProgress.RemoveListener(OnBuildProgress);
+			GameBuild.OnBuildFinished.RemoveListener(OnBuildFinished);
+			GameBuild.OnBuildStarted.RemoveListener(OnBuildStarted);
+			GameBuild.OnBuildProgress.RemoveListener(OnBuildProgress);
 			_panel.Instance = null;
 		}
 
@@ -59,7 +59,7 @@ namespace Nox.GameBuilder {
 			if (path.StartsWith(applicationPath))
 				path = "Assets" + path[applicationPath.Length..];
 			_outputField.SetValueWithoutNotify(path);
-			BuilderPanel.OutputFolder = path;
+			GameBuilderPanel.OutputFolder = path;
 		}
 
 		private static void OnPlatformChanged(ChangeEvent<Enum> evt) {
@@ -73,20 +73,20 @@ namespace Nox.GameBuilder {
 
 		private void OnBuildClicked(ClickEvent evt) {
 			var options = BuildOptions.None;
-			if (BuilderPanel.OptDevelopment)   options |= BuildOptions.Development;
-			if (BuilderPanel.OptAllowDebugging) options |= BuildOptions.AllowDebugging;
-			if (BuilderPanel.OptProfiler)      options |= BuildOptions.ConnectWithProfiler;
-			if (BuilderPanel.OptScriptsOnly)   options |= BuildOptions.BuildScriptsOnly;
-			if (BuilderPanel.OptDeepProfiling) options |= BuildOptions.EnableDeepProfilingSupport;
+			if (GameBuilderPanel.OptDevelopment)   options |= BuildOptions.Development;
+			if (GameBuilderPanel.OptAllowDebugging) options |= BuildOptions.AllowDebugging;
+			if (GameBuilderPanel.OptProfiler)      options |= BuildOptions.ConnectWithProfiler;
+			if (GameBuilderPanel.OptScriptsOnly)   options |= BuildOptions.BuildScriptsOnly;
+			if (GameBuilderPanel.OptDeepProfiling) options |= BuildOptions.EnableDeepProfilingSupport;
 
-			var data = new BuildData {
-				OutputPath   = BuilderPanel.OutputFolder,
-				Mods         = Builder.GetKernelMods(_panel.API.ModAPI.GetMods()),
+			var data = new GameBuildData {
+				OutputPath   = GameBuilderPanel.OutputFolder,
+				Mods         = GameBuild.GetKernelMods(_panel.API.ModAPI.GetMods()),
 				Target       = (Platform)_platformEnum.value,
 				BuildOptions = options
 			};
 
-			Builder.Build(data).Forget();
+			GameBuild.Build(data).Forget();
 		}
 
 		private void OnBuildStarted() {
@@ -107,7 +107,7 @@ namespace Nox.GameBuilder {
 			Logger.ClearProgress();
 		}
 
-		private void OnBuildStarted(BuildData arg0)
+		private void OnBuildStarted(GameBuildData arg0)
 			=> OnBuildStarted();
 
 		private void OnBuildFinished(BuildResult arg0) {
@@ -183,17 +183,17 @@ namespace Nox.GameBuilder {
 			_optScriptsOnly   = root.Q<Toggle>("opt-scripts-only");
 			_optDeepProfiling = root.Q<Toggle>("opt-deep-profiling");
 
-			_optDevelopment.SetValueWithoutNotify(BuilderPanel.OptDevelopment);
-			_optAllowDebugging.SetValueWithoutNotify(BuilderPanel.OptAllowDebugging);
-			_optProfiler.SetValueWithoutNotify(BuilderPanel.OptProfiler);
-			_optScriptsOnly.SetValueWithoutNotify(BuilderPanel.OptScriptsOnly);
-			_optDeepProfiling.SetValueWithoutNotify(BuilderPanel.OptDeepProfiling);
+			_optDevelopment.SetValueWithoutNotify(GameBuilderPanel.OptDevelopment);
+			_optAllowDebugging.SetValueWithoutNotify(GameBuilderPanel.OptAllowDebugging);
+			_optProfiler.SetValueWithoutNotify(GameBuilderPanel.OptProfiler);
+			_optScriptsOnly.SetValueWithoutNotify(GameBuilderPanel.OptScriptsOnly);
+			_optDeepProfiling.SetValueWithoutNotify(GameBuilderPanel.OptDeepProfiling);
 
-			_optDevelopment.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptDevelopment      = e.newValue);
-			_optAllowDebugging.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptAllowDebugging = e.newValue);
-			_optProfiler.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptProfiler            = e.newValue);
-			_optScriptsOnly.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptScriptsOnly      = e.newValue);
-			_optDeepProfiling.RegisterCallback<ChangeEvent<bool>>(e => BuilderPanel.OptDeepProfiling  = e.newValue);
+			_optDevelopment.RegisterCallback<ChangeEvent<bool>>(e => GameBuilderPanel.OptDevelopment      = e.newValue);
+			_optAllowDebugging.RegisterCallback<ChangeEvent<bool>>(e => GameBuilderPanel.OptAllowDebugging = e.newValue);
+			_optProfiler.RegisterCallback<ChangeEvent<bool>>(e => GameBuilderPanel.OptProfiler            = e.newValue);
+			_optScriptsOnly.RegisterCallback<ChangeEvent<bool>>(e => GameBuilderPanel.OptScriptsOnly      = e.newValue);
+			_optDeepProfiling.RegisterCallback<ChangeEvent<bool>>(e => GameBuilderPanel.OptDeepProfiling  = e.newValue);
 
 			_buildingContainer   = root.Q<VisualElement>("building");
 			_buildingStatusLabel = _buildingContainer.Q<Label>("status");
@@ -208,7 +208,7 @@ namespace Nox.GameBuilder {
 			_openOutputButton.RegisterCallback<ClickEvent>(OnOpenOutputClicked);
 			_selectOutputButton.RegisterCallback<ClickEvent>(OnSelectOutputClicked);
 			_buildButton.RegisterCallback<ClickEvent>(OnBuildClicked);
-			_outputField.SetValueWithoutNotify(BuilderPanel.OutputFolder);
+			_outputField.SetValueWithoutNotify(GameBuilderPanel.OutputFolder);
 			_platformEnum.RegisterCallback<ChangeEvent<Enum>>(OnPlatformChanged);
 			_platformEnum.Init(PlatformExtensions.CurrentPlatform);
 			_resultOkButton.RegisterCallback<ClickEvent>(OnBuildResultOKClicked);
@@ -217,14 +217,14 @@ namespace Nox.GameBuilder {
 			_resultContainer.style.display   = DisplayStyle.None;
 
 			RefreshLists();
-			if (Builder.IsBuilding) OnBuildStarted();
+			if (GameBuild.IsBuilding) OnBuildStarted();
 
 			return _content = root;
 		}
 
 		private void RefreshLists() {
 			_modsList.Clear();
-			var mods         = Builder.GetKernelMods(_panel.API.ModAPI.GetMods());
+			var mods         = GameBuild.GetKernelMods(_panel.API.ModAPI.GetMods());
 			var itemTemplate = _panel.API.AssetAPI.GetAsset<VisualTreeAsset>("panels/mod_item.uxml");
 
 			foreach (var mod in mods) {
@@ -244,7 +244,7 @@ namespace Nox.GameBuilder {
 			}
 
 			_scenesList.Clear();
-			var scenes        = Builder.GetScenesToBuild(mods);
+			var scenes        = GameBuild.GetScenesToBuild(mods);
 			var sceneTemplate = _panel.API.AssetAPI.GetAsset<VisualTreeAsset>("panels/scene_item.uxml");
 
 			foreach (var scene in scenes) {

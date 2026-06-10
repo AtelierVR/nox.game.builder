@@ -6,7 +6,7 @@ using Nox.CCK.Utils;
 using Nox.Editor.Panel;
 
 namespace Nox.GameBuilder {
-	public class BuilderPanel : IEditorModInitializer, IPanel {
+	public class GameBuilderPanel : IEditorModInitializer, IPanel {
 		internal IEditorModCoreAPI API;
 
 		private static readonly string[] PanelPath = {
@@ -23,7 +23,7 @@ namespace Nox.GameBuilder {
 		public string[] GetPath()
 			=> PanelPath;
 
-		public BuilderInstance Instance;
+		public GameBuilderInstance Instance;
 
 		public IInstance[] GetInstances()
 			=> Instance != null
@@ -89,8 +89,8 @@ namespace Nox.GameBuilder {
 
 		public IInstance Instantiate(IWindow window, Dictionary<string, object> data) {
 			if (Instance != null)
-				throw new InvalidOperationException($"{nameof(BuilderPanel)} only supports a single instance.");
-			return Instance = new BuilderInstance(this, window, data);
+				throw new InvalidOperationException($"{nameof(GameBuilderPanel)} only supports a single instance.");
+			return Instance = new GameBuilderInstance(this, window, data);
 		}
 	}
 }

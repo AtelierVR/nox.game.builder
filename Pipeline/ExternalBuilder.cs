@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Cysharp.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 using Nox.CCK.Utils;
 using Nox.ModLoader;
 using UnityEditor;
@@ -33,10 +30,10 @@ namespace Nox.GameBuilder.Pipeline {
 		/// Marks this session as a build job so that OnAfterDomainReload can
 		/// (re-)schedule the build after every subsequent domain reload.
 		/// </summary>
-		public static void Build() {
+		public static void GameBuild() {
 			SessionState.SetBool(KeyDone, false);
 			SessionState.SetBool(KeyRequested, true);
-			EditorApplication.delayCall += StartBuild;
+			EditorApplication.delayCall += StartGameBuild;
 		}
 
 		/// <summary>
@@ -54,7 +51,7 @@ namespace Nox.GameBuilder.Pipeline {
 
 		/// <summary>
 		/// Called automatically after every domain reload.
-		/// If Build() or BuildMod() was invoked earlier this session, re-schedules.
+		/// If GameBuild() or BuildMod() was invoked earlier this session, re-schedules.
 		/// </summary>
 		[InitializeOnLoadMethod]
 		static void OnAfterDomainReload() {
@@ -70,13 +67,13 @@ namespace Nox.GameBuilder.Pipeline {
 			if (isModBuild)
 				EditorApplication.delayCall += StartBuildMod;
 			else
-				EditorApplication.delayCall += StartBuild;
+				EditorApplication.delayCall += StartGameBuild;
 		}
 
-		static void StartBuild() {
+		static void StartGameBuild() {
 			if (SessionState.GetBool(KeyRunning, false)) return;
 			SessionState.SetBool(KeyRunning, true);
-			RunBuildAsync().Forget();
+			RunGameBuildAsync().Forget();
 		}
 
 		static void StartBuildMod() {
@@ -93,120 +90,40 @@ namespace Nox.GameBuilder.Pipeline {
 			try {
 				await UniTask.NextFrame();
 
-				var args   = Environment.GetCommandLineArgs();
-				var modId  = GetArg(args, "-noxModToBuild");
-				var output = GetArg(args, "-noxOutputPath") ?? "build/mod";
+				var args      = Environment.GetCommandLineArgs();
+				var modId     = GetArg(args, "-noxModToBuild");
+				var output    = GetArg(args, "-noxOutputPath") ?? "build/mods";
 				var targetStr = GetArg(args, "-noxTargetPlatform") ?? "StandaloneWindows64";
 
 				if (string.IsNullOrEmpty(modId)) {
-					Logger.LogError("Missing -noxModToBuild argument. Usage: -noxModToBuild nox.network", tag: nameof(ExternalBuilder));
+					Logger.LogError("Missing -noxModToBuild argument (comma-separated for multiple).", tag: nameof(ExternalBuilder));
 					SessionState.SetBool(KeyDone, true);
 					EditorApplication.Exit(1);
 					return;
 				}
 
-				Logger.Log($"BuildMod: {modId} -> {output} (target: {targetStr})", tag: nameof(ExternalBuilder));
-
-				// Resolve platform
 				var platform = PlatformExtensions.CurrentPlatform;
-				// Override if target specified and differs
-				if (!string.IsNullOrEmpty(targetStr)) {
+				if (!string.IsNullOrEmpty(targetStr))
 					try { platform = (Platform)Enum.Parse(typeof(Platform), targetStr); } catch { }
-				}
 
-				// Load all mods
-				await ModManager.LoadMods();
-				var allMods = ModManager.GetMods();
+				var data = new ModBuildData {
+					ModIds     = modId.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToArray(),
+					OutputPath = output,
+					Target     = platform,
+					ProgressCallback = (p, m) => Logger.Log($"{p * 100f:0}% – {m}", tag: nameof(ExternalBuilder))
+				};
 
-				// Find the target mod
-				var mod = allMods.FirstOrDefault(m => m.GetMetadata().GetId().Equals(modId, StringComparison.OrdinalIgnoreCase));
+				var result = await ModBuild.Build(data);
 
-				if (mod == null) {
-					Logger.LogError($"Mod not found: {modId}. Available: {string.Join(", ", allMods.Select(m => m.GetMetadata().GetId()))}", tag: nameof(ExternalBuilder));
+				if (result.IsFailed) {
+					Logger.LogError($"BuildMod failed: {result.Message}", tag: nameof(ExternalBuilder));
 					SessionState.SetBool(KeyDone, true);
 					EditorApplication.Exit(1);
-					return;
-				}
-
-				var meta       = mod.GetMetadata();
-				var modFolder  = mod.GetData<string>("folder");
-
-				Logger.Log($"Found mod: {meta.GetId()} at {modFolder}", tag: nameof(ExternalBuilder));
-
-				// Ensure output directory
-				if (!Directory.Exists(output))
-					Directory.CreateDirectory(output);
-
-				// ── 1. Build AssetBundles ──────────────────────────
-				var assetResults = BuildAssets.BuildAsAssetBundles(new[] { mod }, platform, output);
-
-				if (assetResults != null && assetResults.Length > 0) {
-					Logger.Log($"Built {assetResults.Sum(r => r.outputs.Length)} asset bundle(s)", tag: nameof(ExternalBuilder));
 				} else {
-					Logger.Log("No asset bundles produced (mod may have no assets folder)", tag: nameof(ExternalBuilder));
+					Logger.Log($"BuildMod succeeded: {result.Output}", tag: nameof(ExternalBuilder));
+					SessionState.SetBool(KeyDone, true);
+					EditorApplication.Exit(0);
 				}
-
-				// ── 2. Copy DLLs from Library/ScriptAssemblies/ ────
-				var asmDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "ScriptAssemblies"));
-				var copiedDlls = new List<string>();
-
-				if (Directory.Exists(modFolder)) {
-					var asmdefFiles = Directory.GetFiles(modFolder, "*.asmdef", SearchOption.AllDirectories);
-					foreach (var asmdefFile in asmdefFiles) {
-						try {
-							var json    = JObject.Parse(File.ReadAllText(asmdefFile));
-							var asmName = json["name"]?.Value<string>();
-							if (string.IsNullOrEmpty(asmName)) continue;
-
-							var dllPath = Path.Combine(asmDir, asmName + ".dll");
-							if (!File.Exists(dllPath)) {
-								Logger.LogWarning($"DLL not found: {asmName}.dll", tag: nameof(ExternalBuilder));
-								continue;
-							}
-
-							var destPath = Path.Combine(output, asmName + ".dll");
-							File.Copy(dllPath, destPath, true);
-							copiedDlls.Add(asmName + ".dll");
-							Logger.Log($"  Copied: {asmName}.dll", tag: nameof(ExternalBuilder));
-						} catch (Exception ex) {
-							Logger.LogWarning($"Failed to process asmdef {asmdefFile}: {ex.Message}", tag: nameof(ExternalBuilder));
-						}
-					}
-				}
-
-				// ── 3. Copy mod manifest ──────────────────────────
-				foreach (var mfName in new[] { "nox.mod.json", "nox.mod.jsonc" }) {
-					var manifestPath = Path.Combine(modFolder ?? "", mfName);
-					if (File.Exists(manifestPath)) {
-						File.Copy(manifestPath, Path.Combine(output, mfName), true);
-						Logger.Log($"  Copied: {mfName}", tag: nameof(ExternalBuilder));
-					}
-				}
-
-				// ── 4. Copy package.json ─────────────────────────
-				var packageJsonPath = Path.Combine(modFolder ?? "", "package.json");
-				if (File.Exists(packageJsonPath)) {
-					File.Copy(packageJsonPath, Path.Combine(output, "package.json"), true);
-					Logger.Log("  Copied: package.json", tag: nameof(ExternalBuilder));
-				}
-
-				// ── 5. Copy native plugins ────────────────────────
-				var pluginsDir = Path.Combine(modFolder ?? "", "Plugins");
-				if (Directory.Exists(pluginsDir)) {
-					CopyDirectory(pluginsDir, Path.Combine(output, "Plugins"));
-					Logger.Log("  Copied: Plugins/", tag: nameof(ExternalBuilder));
-				}
-
-				// ── 6. Summary ────────────────────────────────────
-				var bundleCount = assetResults?.Sum(r => r.outputs.Length) ?? 0;
-				Logger.Log($"", tag: nameof(ExternalBuilder));
-				Logger.Log($"══ BuildMod complete: {modId} ══", tag: nameof(ExternalBuilder));
-				Logger.Log($"  Output : {Path.GetFullPath(output)}", tag: nameof(ExternalBuilder));
-				Logger.Log($"  DLLs   : {copiedDlls.Count} ({string.Join(", ", copiedDlls)})", tag: nameof(ExternalBuilder));
-				Logger.Log($"  Bundles: {bundleCount}", tag: nameof(ExternalBuilder));
-
-				SessionState.SetBool(KeyDone, true);
-				EditorApplication.Exit(0);
 			} catch (Exception e) {
 				Logger.LogError($"BuildMod failed: {e}", tag: nameof(ExternalBuilder));
 				SessionState.SetBool(KeyDone, true);
@@ -217,30 +134,16 @@ namespace Nox.GameBuilder.Pipeline {
 		}
 
 		// ═══════════════════════════════════════════════════════════════
-		// Helpers
-		// ═══════════════════════════════════════════════════════════════
-
-		static void CopyDirectory(string sourceDir, string destDir) {
-			Directory.CreateDirectory(destDir);
-			foreach (var file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories)) {
-				var relative = file.Substring(sourceDir.Length + 1);
-				var dest = Path.Combine(destDir, relative);
-				Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-				File.Copy(file, dest, true);
-			}
-		}
-
-		// ═══════════════════════════════════════════════════════════════
 		// Build — full player + mods + asset bundles (existing)
 		// ═══════════════════════════════════════════════════════════════
 
-		private static async UniTaskVoid RunBuildAsync() {
+		private static async UniTaskVoid RunGameBuildAsync() {
 			try {
 				// One frame yield to let any remaining deferred calls flush
 				await UniTask.NextFrame();
 
 				var args            = Environment.GetCommandLineArgs();
-				// -noxOutputPath is always a directory; Builder appends BuildName + extension.
+				// -noxOutputPath is always a directory; GameBuild appends BuildName + extension.
 				var output      = GetArg(args, "-noxOutputPath") ?? "build";
 				// Use -noxBuildName if provided, otherwise fall back to productName.
 				// We intentionally ignore -customBuildName (set by game-ci to the target platform name).
@@ -270,11 +173,11 @@ namespace Nox.GameBuilder.Pipeline {
 				// Discover and load all mods (kernel mods will be filtered inside Builder)
 				await ModManager.LoadMods();
 
-				var flags = BuildFlags.None;
+				var flags = GameBuildFlags.None;
 				if (Array.IndexOf(args, "-noxAutoConfirmClearOutput") >= 0)
-					flags |= BuildFlags.AutoConfirmClearOutput;
+					flags |= GameBuildFlags.AutoConfirmClearOutput;
 
-				var data = new BuildData {
+				var data = new GameBuildData {
 					OutputPath = output,
 					BuildName  = buildName,
 					Target     = platform,
@@ -285,7 +188,7 @@ namespace Nox.GameBuilder.Pipeline {
 					ProgressCallback = (p, m) => Logger.Log($"{p * 100f:0}% – {m}", tag: nameof(ExternalBuilder))
 				};
 
-				var result = await Builder.Build(data);
+				var result = await Pipeline.GameBuild.Build(data);
 
 				if (result.IsFailed) {
 					Logger.LogError($"Build failed: {result.Message}", tag: nameof(ExternalBuilder));
