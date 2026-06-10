@@ -4,10 +4,18 @@
     "references": [
         "Nox.CCK",
         "UniTask",
-        "Nox.ModLoader"
+        "Nox.ModLoader",
+        "Nox.Editor"
     ],
     "includePlatforms": [
         "Editor"
+    ],
+    "versionDefines": [
+        {
+            "name": "nox.editor",
+            "expression": "",
+            "define": "HAS_NOX_EDITOR"
+        }
     ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -15,6 +23,5 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
     "noEngineReferences": false
 }
