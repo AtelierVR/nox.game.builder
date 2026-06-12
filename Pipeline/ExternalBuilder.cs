@@ -35,7 +35,7 @@ namespace Nox.GameBuilder.Pipeline {
 		public static void GameBuild() {
 			SessionState.SetBool(KeyDone, false);
 			SessionState.SetBool(KeyRequested, true);
-			EditorApplication.delayCall += StartGameBuild;
+			StartGameBuild();
 		}
 
 		/// <summary>
@@ -48,7 +48,7 @@ namespace Nox.GameBuilder.Pipeline {
 		public static void BuildMod() {
 			SessionState.SetBool(KeyDone, false);
 			SessionState.SetBool(KeyModRequested, true);
-			EditorApplication.delayCall += StartBuildMod;
+			StartBuildMod();
 		}
 
 		/// <summary>
@@ -67,9 +67,9 @@ namespace Nox.GameBuilder.Pipeline {
 			SessionState.SetBool(KeyRunning, false);
 
 			if (isModBuild)
-				EditorApplication.delayCall += StartBuildMod;
+				StartBuildMod();
 			else
-				EditorApplication.delayCall += StartGameBuild;
+				StartGameBuild();
 		}
 
 		static void StartGameBuild() {
