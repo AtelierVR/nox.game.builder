@@ -1,6 +1,4 @@
 using System;
-using System.IO;
-using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Attributes;
 using Nox.CCK.Utils;
@@ -41,7 +39,7 @@ namespace Nox.GameBuilder.Pipeline {
 		/// <summary>
 		/// Builds only a single mod (DLLs + AssetBundles), without building the player.
 		/// Usage: -executeMethod Nox.GameBuilder.Pipeline.ExternalBuilder.BuildMod
-		///        -noxModToBuild nox.network
+		///        -noxMod nox.network
 		///        -noxOutputPath build/nox.network
 		///        -noxTargetPlatform StandaloneWindows64
 		/// </summary>
@@ -92,51 +90,68 @@ namespace Nox.GameBuilder.Pipeline {
 			try {
 				await UniTask.NextFrame();
 
-				var args      = Environment.GetCommandLineArgs();
-				var modId     = GetArg(args, "-noxModToBuild");
-				var output    = GetArg(args, "-noxOutputPath") ?? "build/mods";
-				var targetStr = GetArg(args, "-noxTargetPlatform") ?? "StandaloneWindows64";
+				var args  = ArgsParser.Parse();
+				var modIds = args.GetList("noxMod");
+				var targets = args.GetDictionary("noxOutput");
+				var flags   = ModBuildFlags.None;
 
-				if (string.IsNullOrEmpty(modId)) {
-					Logger.LogError("Missing -noxModToBuild argument (comma-separated for multiple).", tag: nameof(ExternalBuilder));
+				if (modIds.Count == 0) {
+					Logger.LogError("Missing --noxMod argument (comma-separated or repeated).", tag: nameof(ExternalBuilder));
+					SessionState.SetBool(KeyDone, true);
+					EditorApplication.Exit(1);
+					return;
+				}
+				if (targets.Count == 0) {
+					Logger.LogError("Missing --noxOutput argument (e.g. StandaloneWindows64=path).", tag: nameof(ExternalBuilder));
 					SessionState.SetBool(KeyDone, true);
 					EditorApplication.Exit(1);
 					return;
 				}
 
-				var platform = PlatformExtensions.CurrentPlatform;
-				if (!string.IsNullOrEmpty(targetStr))
-					try { platform = (Platform)Enum.Parse(typeof(Platform), targetStr); } catch { }
-
 				// Discover and load all mods so ModManager.Mods is populated
 				await ModManager.LoadMods();
 
-				// Invoke all registered build steps for ModBuild
-				NoxAttribute.Invoke("build:any");
-				NoxAttribute.Invoke("build:mod");
+				// Invoke all registered build steps for ModBuild (once)
+				NoxInvokableAttribute.Invoke("build:any", modIds, targets, flags);
+				NoxInvokableAttribute.Invoke("build:mod", modIds, targets, flags);
+				NoxInvokableAttribute.Invoke("build:mod:start", modIds, targets, flags);
 
-				var data = new ModBuildData {
-					ModIds     = modId.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToArray(),
-					OutputPath = output,
-					Target     = platform,
-					ProgressCallback = (p, m) => Logger.Log($"{p * 100f:0}% – {m}", tag: nameof(ExternalBuilder))
-				};
-
-				var result = await ModBuild.Build(data);
-
-				if (result.IsFailed) {
-					Logger.LogError($"BuildMod failed: {result.Message}", tag: nameof(ExternalBuilder));
-					SessionState.SetBool(KeyDone, true);
-					EditorApplication.Exit(1);
-				} else {
-					Logger.Log($"BuildMod succeeded: {result.Output}", tag: nameof(ExternalBuilder));
-					SessionState.SetBool(KeyDone, true);
-					EditorApplication.Exit(0);
+				int exitCode = 0;
+				foreach (var (platStr, path) in targets) {
+					if (!Enum.TryParse<BuildTarget>(platStr, out var buildTarget)) {
+						Logger.LogWarning($"Unknown build target '{platStr}', skipping.", tag: nameof(ExternalBuilder));
+						continue;
+					}
+					var plat = buildTarget.GetPlatform();
+					if (plat == Platform.None) {
+						Logger.LogWarning($"Unsupported platform '{platStr}', skipping.", tag: nameof(ExternalBuilder));
+						continue;
+					}
+					Logger.Log($"Building for {plat} → {path}", tag: nameof(ExternalBuilder));
+					NoxInvokableAttribute.Invoke("build:mod:platform:start", modIds, plat, path);
+					var data = new ModBuildData {
+						ModIds     = modIds.ToArray(),
+						OutputPath = path,
+						Target     = plat,
+						Flags      = flags,
+						ProgressCallback = (p, m) => Logger.Log($"{p * 100f:0}% – {m}", tag: nameof(ExternalBuilder))
+					};
+					var result = await ModBuild.Build(data);
+					if (result.IsFailed) {
+						Logger.LogError($"BuildMod [{plat}] failed: {result.Message}", tag: nameof(ExternalBuilder));
+						exitCode = 1;
+					} else {
+						Logger.Log($"BuildMod [{plat}] succeeded: {result.Output}", tag: nameof(ExternalBuilder));
+					}
+					NoxInvokableAttribute.Invoke("build:mod:platform:done", modIds, plat, path, result);
 				}
+				NoxInvokableAttribute.Invoke("build:mod:done", modIds, targets, exitCode);
+				SessionState.SetBool(KeyDone, true);
+				EditorApplication.Exit(exitCode);
 			} catch (Exception e) {
 				Logger.LogError($"BuildMod failed: {e}", tag: nameof(ExternalBuilder));
 				SessionState.SetBool(KeyDone, true);
-				EditorApplication.Exit(1);
+				EditorApplication.Exit(2);
 			} finally {
 				SessionState.SetBool(KeyRunning, false);
 			}
@@ -151,15 +166,12 @@ namespace Nox.GameBuilder.Pipeline {
 				// One frame yield to let any remaining deferred calls flush
 				await UniTask.NextFrame();
 
-				var args            = Environment.GetCommandLineArgs();
-				// -noxOutputPath is always a directory; GameBuild appends BuildName + extension.
-				var output      = GetArg(args, "-noxOutputPath") ?? "build";
-				// Use -noxBuildName if provided, otherwise fall back to productName.
-				// We intentionally ignore -customBuildName (set by game-ci to the target platform name).
-				var buildName   = GetArg(args, "-noxBuildName") ?? Application.productName;
+				var args           = ArgsParser.Parse();
+				var output         = args.Get("noxOutputPath") ?? "build";
+				var buildName      = args.Get("noxBuildName") ?? Application.productName;
 				var platform       = PlatformExtensions.CurrentPlatform;
-				var releaseVersion = GetArg(args, "-noxReleaseVersion");
-				var releaseChannel = GetArg(args, "-noxReleaseChannel");
+				var releaseVersion = args.Get("noxReleaseVersion");
+				var releaseChannel = args.Get("noxReleaseChannel");
 
 				var debug = string.Join("\n", new[] {
 					$"  platform       = {platform.GetPlatformName()}",
@@ -167,15 +179,12 @@ namespace Nox.GameBuilder.Pipeline {
 					$"  buildName      = {buildName}",
 					$"  releaseVersion = {releaseVersion ?? "(not set)"}",
 					$"  releaseChannel = {releaseChannel ?? "(not set)"}",
-					$"  args           = {string.Join(" ", args)}"
+					$"  args           = {args}"
 				});
 
 				Logger.Log($"Starting external build with parameters:\n{debug}", tag: nameof(ExternalBuilder));
 
 				// Apply release version to PlayerSettings only if it actually changed.
-				// Setting bundleVersion always marks ProjectSettings dirty, which causes
-				// Unity to force a synchronous recompile (→ domain reload) inside
-				// BuildPipeline.BuildPlayer, destroying our async state machine.
 				if (!string.IsNullOrEmpty(releaseVersion) && PlayerSettings.bundleVersion != releaseVersion)
 					PlayerSettings.bundleVersion = releaseVersion;
 
@@ -183,11 +192,11 @@ namespace Nox.GameBuilder.Pipeline {
 				await ModManager.LoadMods();
 
 				// Invoke all registered build steps for GameBuild
-				NoxAttribute.Invoke("build:any");
-				NoxAttribute.Invoke("build:game");
+				NoxInvokableAttribute.Invoke("build:any");
+				NoxInvokableAttribute.Invoke("build:game");
 
 				var flags = GameBuildFlags.None;
-				if (Array.IndexOf(args, "-noxAutoConfirmClearOutput") >= 0)
+				if (args.GetBool("noxAutoConfirmClearOutput"))
 					flags |= GameBuildFlags.AutoConfirmClearOutput;
 
 				var data = new GameBuildData {
@@ -215,15 +224,11 @@ namespace Nox.GameBuilder.Pipeline {
 			} catch (Exception e) {
 				Logger.LogError($"Unexpected error: {e}", tag: nameof(ExternalBuilder));
 				SessionState.SetBool(KeyDone, true);
-				EditorApplication.Exit(1);
+				EditorApplication.Exit(2);
 			} finally {
 				SessionState.SetBool(KeyRunning, false);
 			}
 		}
 
-		private static string GetArg(string[] args, string name) {
-			var idx = Array.IndexOf(args, name);
-			return idx >= 0 && idx + 1 < args.Length ? args[idx + 1] : null;
-		}
 	}
 }

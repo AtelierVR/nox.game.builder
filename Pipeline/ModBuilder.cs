@@ -15,6 +15,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEditor;
 using Logger = Nox.CCK.Utils.Logger;
+using Nox.CCK.Attributes;
 
 namespace Nox.GameBuilder.Pipeline {
 	public static class ModBuild {
@@ -61,6 +62,7 @@ namespace Nox.GameBuilder.Pipeline {
 				data.ProgressCallback(0.02f, "Preparing output...");
 				await UniTask.Yield();
 				PrepareOutputDirectory(data.OutputPath);
+				NoxInvokableAttribute.Invoke("build:mod:prepare", data.ModIds, data.Target, data.OutputPath);
 
 				// ── 1. Load mods ──────────────────────────────────
 				data.ProgressCallback(0.05f, "Loading mods...");
@@ -104,6 +106,7 @@ namespace Nox.GameBuilder.Pipeline {
 
 				managedDir = Path.Combine(playerTemp, playerName + "_Data", "Managed");
 				var ext = Library.GetExtension(platform);
+				NoxInvokableAttribute.Invoke("build:mod:player:done", data.ModIds, platform, managedDir);
 
 				// ── 3. Process each mod ───────────────────────────
 				var totalDlls    = 0;
@@ -164,7 +167,6 @@ namespace Nox.GameBuilder.Pipeline {
 							} catch (Exception ex) {
 								Logger.LogWarning($"Failed to process asmdef {asmdefFile}: {ex.Message}", tag: nameof(ModBuild));
 							}
-
 					// ── 2c. Write manifest ─────────────────────────
 					var bundleAssets = new JArray();
 					if (Directory.Exists(assetsDir)) {
@@ -240,6 +242,22 @@ namespace Nox.GameBuilder.Pipeline {
 					}
 
 
+					// ── 2b2. Resolve entrypoint assemblies ──────
+					var entries = meta.GetEntryPoints();
+					var dllNames = new HashSet<string>(copiedDlls.Select(d => Path.GetFileNameWithoutExtension(d.path)));
+					foreach (var section in entries.All) {
+						foreach (var element in section.Value) {
+							if (!string.IsNullOrEmpty(element.Assembly)) continue;
+							// Convention: namespace == assembly name
+							if (dllNames.Contains(element.Namespace)) {
+								element.Assembly = element.Namespace;
+								Logger.Log($"Resolved entrypoint assembly: {element.Namespace}.{element.Class} → {element.Namespace}", tag: nameof(ModBuild));
+							} else {
+								Logger.LogWarning($"Could not resolve assembly for entrypoint {element.FullName} in mod {meta.GetId()}", tag: nameof(ModBuild));
+							}
+						}
+					}
+
 					var manifest = meta.ToObject(ModMetadataFormat.EntryPointObject);
 					manifest["references"] = refs;
 					manifest["assets"]     = bundleAssets;
@@ -253,6 +271,7 @@ namespace Nox.GameBuilder.Pipeline {
 					totalDlls    += copiedDlls.Count;
 					totalBundles += bundleAssets.Count;
 					Logger.Log($"  Built {meta.GetId()}: {copiedDlls.Count} DLLs, {bundleAssets.Count} bundles", tag: nameof(ModBuild));
+					NoxInvokableAttribute.Invoke("build:mod:mod:done", meta.GetId(), copiedDlls.Count, bundleAssets.Count);
 				}
 
 				// Cleanup
