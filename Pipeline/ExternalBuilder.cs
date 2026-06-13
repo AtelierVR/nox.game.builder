@@ -118,16 +118,12 @@ namespace Nox.GameBuilder.Pipeline {
 
 				int exitCode = 0;
 				foreach (var (platStr, path) in targets) {
-					if (!Enum.TryParse<BuildTarget>(platStr, out var buildTarget)) {
-						Logger.LogWarning($"Unknown build target '{platStr}', skipping.", tag: nameof(ExternalBuilder));
-						continue;
-					}
-					var plat = buildTarget.GetPlatform();
+					var plat = platStr.GetPlatformFromName();
 					if (plat == Platform.None) {
-						Logger.LogWarning($"Unsupported platform '{platStr}', skipping.", tag: nameof(ExternalBuilder));
+						Logger.LogWarning($"Unknown platform '{platStr}', skipping. Use: windows, linux, macos, android, ios.", tag: nameof(ExternalBuilder));
 						continue;
 					}
-					Logger.Log($"Building for {plat} → {path}", tag: nameof(ExternalBuilder));
+					Logger.Log($"Building for {plat.GetPlatformName()} → {path}", tag: nameof(ExternalBuilder));
 					NoxInvokableAttribute.Invoke("build:mod:platform:start", modIds, plat, path);
 					var data = new ModBuildData {
 						ModIds     = modIds.ToArray(),
