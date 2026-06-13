@@ -50,7 +50,7 @@ namespace Nox.GameBuilder.Pipeline {
 		// [Nox] event hooks — triggered automatically by the build pipeline
 		// ═══════════════════════════════════════════════════════════════
 
-		[Nox("build:mod:start")]
+		[NoxInvokable("build:mod:start")]
 		public static void OnBuildStart() {
 			if (!IsGithubAction) return;
 			Group("Nox Mod Build");
@@ -58,38 +58,38 @@ namespace Nox.GameBuilder.Pipeline {
 			SummaryLine("");
 		}
 
-		[Nox("build:mod:prepare")]
+		[NoxInvokable("build:mod:prepare")]
 		public static void OnBuildPrepare() {
 			if (!IsGithubAction) return;
 			Group("Preparing output");
 		}
 
-		[Nox("build:mod:player:done")]
+		[NoxInvokable("build:mod:player:done")]
 		public static void OnPlayerBuildDone() {
 			if (!IsGithubAction) return;
 			EndGroup();
 			Group("Processing mods");
 		}
 
-		[Nox("build:mod:platform:start")]
+		[NoxInvokable("build:mod:platform:start")]
 		public static void OnPlatformStart() {
 			if (!IsGithubAction) return;
 		}
 
-		[Nox("build:mod:platform:done")]
+		[NoxInvokable("build:mod:platform:done")]
 		public static void OnPlatformDone() {
 			if (!IsGithubAction) return;
 			FlushSummary();
 		}
 
-		[Nox("build:mod:mod:done")]
+		[NoxInvokable("build:mod:mod:done")]
 		public static void OnModDone(string modId, int dllCount, int bundleCount) {
 			if (!IsGithubAction) return;
 			SummaryLine($"- **{modId}**: {dllCount} DLLs, {bundleCount} bundles");
 			Notice($"Mod built: {modId} ({dllCount} DLLs, {bundleCount} bundles)");
 		}
 
-		[Nox("build:mod:done")]
+		[NoxInvokable("build:mod:done")]
 		public static void OnBuildDone() {
 			if (!IsGithubAction) return;
 			while (_groupDepth > 0)
@@ -157,7 +157,7 @@ namespace Nox.GameBuilder.Pipeline {
 				_inner = inner;
 			}
 
-			public void LogFormat(LogType logType, UnityEngine.Object context, string format, params object[] args) {
+			public void LogFormat(UnityEngine.LogType logType, UnityEngine.Object context, string format, params object[] args) {
 				var message = string.Format(format, args);
 				LogMessage(logType, context, message);
 			}
@@ -168,16 +168,16 @@ namespace Nox.GameBuilder.Pipeline {
 				_inner?.LogException(exception, context);
 			}
 
-			private void LogMessage(LogType logType, UnityEngine.Object context, string message) {
+			private void LogMessage(UnityEngine.LogType logType, UnityEngine.Object context, string message) {
 				switch (logType) {
-					case LogType.Error:
-					case LogType.Exception:
+					case UnityEngine.LogType.Error:
+					case UnityEngine.LogType.Exception:
 						Console.WriteLine($"::error::{Escape(message)}");
 						break;
-					case LogType.Warning:
+					case UnityEngine.LogType.Warning:
 						Console.WriteLine($"::warning::{Escape(message)}");
 						break;
-					case LogType.Assert:
+					case UnityEngine.LogType.Assert:
 						Console.WriteLine($"::error title=Assert::{Escape(message)}");
 						break;
 					default:
