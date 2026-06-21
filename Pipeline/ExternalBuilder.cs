@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Attributes;
 using Nox.CCK.Utils;
@@ -200,7 +201,7 @@ namespace Nox.GameBuilder.Pipeline {
 					BuildName  = buildName,
 					Target     = platform,
 					Flags      = flags,
-					Mods       = ModManager.GetMods(),
+					Mods       = ModManager.GetMods().ToArray(),
 					Version    = releaseVersion,
 					Channel    = releaseChannel,
 					ProgressCallback = (p, m) => Logger.Log($"{p * 100f:0}% – {m}", tag: nameof(ExternalBuilder))
