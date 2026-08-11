@@ -92,11 +92,11 @@ namespace Nox.GameBuilder.Pipeline {
 				await UniTask.NextFrame();
 
 				var args  = ArgsParser.Parse();
-				var modIds = args.GetList("noxMod");
+				var modIds = args.GetArray("noxMod");
 				var targets = args.GetDictionary("noxOutput");
 				var flags   = ModBuildFlags.None;
 
-				if (modIds.Count == 0) {
+				if (modIds.Length == 0) {
 					Logger.LogError("Missing --noxMod argument (comma-separated or repeated).", tag: nameof(ExternalBuilder));
 					SessionState.SetBool(KeyDone, true);
 					EditorApplication.Exit(1);
