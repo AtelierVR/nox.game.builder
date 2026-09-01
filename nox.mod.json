@@ -5,7 +5,7 @@
     "game.builder"
   ],
   "name": "Game Builder",
-  "version": "1.0.0",
+  "version": "1.0.x",
   "description": "Provides the pipeline and tools to build game.",
   "license": "GPL-3.0",
   "icon": null,
