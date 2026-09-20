@@ -223,10 +223,11 @@ namespace Nox.GameBuilder.Pipeline {
 							var plat = platName.GetPlatformFromName();
 							var arch = archName?.GetArchitectureFromName() ?? Architecture.None;
 
-							// Build destination subfolder (null → root of plugins/)
-							var subFolders = Library.GetSubFolders(plat, arch);
-							var subFolder = subFolders.Length > 0 ? subFolders[0] : null;
-							var destRelative = subFolder != null ? subFolder + "/" + fileName : fileName;
+							var subFolder = Library.GetSubFolders(plat, arch)
+							                          .FirstOrDefault(s => !string.IsNullOrEmpty(s));
+							var destRelative = string.IsNullOrEmpty(subFolder)
+								? fileName
+								: subFolder + "/" + fileName;
 							var destFile = Path.Combine(pluginsOutput, destRelative);
 							Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
 							File.Copy(srcFile, destFile, true);
