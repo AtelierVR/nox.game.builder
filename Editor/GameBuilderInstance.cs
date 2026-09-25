@@ -62,11 +62,11 @@ namespace Nox.GameBuilder {
 			GameBuilderPanel.OutputFolder = path;
 		}
 
-		private static void OnPlatformChanged(ChangeEvent<Enum> evt) {
+		private static void OnPlatformChanged(ChangeEvent<string> evt) {
 			/*
 			var mod = ModDescriptorHelper.CurrentMod;
 			if (!mod) return;
-			mod.target = (Platform)evt.newValue;
+			mod.target = evt.newValue.GetPlatform();
 			EditorUtility.SetDirty(mod);
 			*/
 		}
@@ -82,7 +82,7 @@ namespace Nox.GameBuilder {
 			var data = new GameBuildData {
 				OutputPath   = GameBuilderPanel.OutputFolder,
 				Mods         = GameBuild.GetKernelMods(_panel.API.ModAPI.GetMods()),
-				Target       = (Platform)_platformEnum.value,
+				Target       = _platformEnum.value.GetPlatformFromName(),
 				BuildOptions = options
 			};
 
@@ -139,7 +139,7 @@ namespace Nox.GameBuilder {
 		private Button        _openOutputButton;
 		private Button        _buildButton;
 		private Button        _selectOutputButton;
-		private EnumField     _platformEnum;
+		private DropdownField _platformEnum;
 
 		private Toggle _optDevelopment;
 		private Toggle _optAllowDebugging;
@@ -175,7 +175,8 @@ namespace Nox.GameBuilder {
 			_openOutputButton   = root.Q<Button>("open-output");
 			_buildButton        = root.Q<Button>("build");
 			_selectOutputButton = root.Q<Button>("select-output");
-			_platformEnum       = root.Q<EnumField>("platform");
+			_platformEnum       = root.Q<DropdownField>("platform");
+			_platformEnum.choices = PlatformExtensions.All.Select(p => p.Display).ToList();
 
 			_optDevelopment   = root.Q<Toggle>("opt-development");
 			_optAllowDebugging = root.Q<Toggle>("opt-allow-debugging");
@@ -209,8 +210,8 @@ namespace Nox.GameBuilder {
 			_selectOutputButton.RegisterCallback<ClickEvent>(OnSelectOutputClicked);
 			_buildButton.RegisterCallback<ClickEvent>(OnBuildClicked);
 			_outputField.SetValueWithoutNotify(GameBuilderPanel.OutputFolder);
-			_platformEnum.RegisterCallback<ChangeEvent<Enum>>(OnPlatformChanged);
-			_platformEnum.Init(PlatformExtensions.CurrentPlatform);
+			_platformEnum.RegisterCallback<ChangeEvent<string>>(OnPlatformChanged);
+			_platformEnum.SetValueWithoutNotify(PlatformExtensions.CurrentPlatform.Display);
 			_resultOkButton.RegisterCallback<ClickEvent>(OnBuildResultOKClicked);
 
 			_buildingContainer.style.display = DisplayStyle.None;

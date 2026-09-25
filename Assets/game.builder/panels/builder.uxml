@@ -33,8 +33,7 @@
                 <ui:Button text="Open" name="open-output" class="large" style="min-width: 64px;"/>
             </ui:VisualElement>
             <ui:VisualElement style="flex-grow: 1; flex-direction: row; margin-top: 4px;">
-                <ui:EnumField value="None" type="Nox.CCK.Utils.Platform, Nox.CCK" name="platform" class="large"
-                              style="flex-grow: 1;"/>
+                <ui:DropdownField name="platform" class="large" style="flex-grow: 1;"/>
                 <ui:Button text="Build" name="build" class="large" style="min-width: 134px;"/>
             </ui:VisualElement>
         </ui:GroupBox>

@@ -22,7 +22,7 @@ namespace Nox.GameBuilder {
 
 		private VisualElement _modsList;
 		private TextField     _outputField;
-		private EnumField     _platformEnum;
+		private DropdownField _platformEnum;
 		private Button        _buildButton;
 		private VisualElement _buildingContainer;
 		private Label         _statusLabel;
@@ -65,7 +65,7 @@ namespace Nox.GameBuilder {
 
 			_modsList         = root.Q<VisualElement>("mods-list");
 			_outputField      = root.Q<TextField>("output");
-			_platformEnum     = root.Q<EnumField>("platform");
+			_platformEnum     = root.Q<DropdownField>("platform");
 			_buildButton      = root.Q<Button>("build");
 			_buildingContainer = root.Q<VisualElement>("building");
 			_statusLabel      = root.Q<Label>("status");
@@ -106,7 +106,8 @@ namespace Nox.GameBuilder {
 			deselectAll.clicked += () => SelectAllMods(false);
 
 			// Platform
-			_platformEnum.Init(PlatformExtensions.CurrentPlatform);
+			_platformEnum.choices = PlatformExtensions.All.Select(p => p.Display).ToList();
+			_platformEnum.SetValueWithoutNotify(PlatformExtensions.CurrentPlatform.Display);
 
 			// Result OK button
 			var okButton = root.Q<Button>("ok");
@@ -192,7 +193,7 @@ namespace Nox.GameBuilder {
 			var data = new ModBuildData {
 				ModIds     = _selectedModIds.ToArray(),
 				OutputPath = _outputField.value,
-				Target     = (Platform)_platformEnum.value,
+				Target     = _platformEnum.value.GetPlatformFromName(),
 			};
 
 			ModBuild.Build(data).Forget();

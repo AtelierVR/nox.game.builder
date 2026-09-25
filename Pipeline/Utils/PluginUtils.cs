@@ -73,7 +73,7 @@ namespace Nox.GameBuilder.Pipeline.Utils {
 
 				// Try each platform's CPU data — first non-empty wins
 				string cpu = null;
-				foreach (Platform p in Enum.GetValues(typeof(Platform))) {
+				foreach (var p in PlatformExtensions.All) {
 					if (p == Platform.None) continue;
 					var bt = p.GetBuildTarget();
 					if (bt == BuildTarget.NoTarget) continue;
