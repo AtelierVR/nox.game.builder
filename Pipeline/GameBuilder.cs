@@ -167,15 +167,15 @@ namespace Nox.GameBuilder.Pipeline {
 
 					for (var i = 0; i < data.Mods.Length; i++) {
 						var mod  = data.Mods[i];
-						var meta = mod.GetMetadata();
+						var meta = mod.Metadata;
 
-						data.ProgressCallback(0.5f + 0.4f * ((float)i / data.Mods.Length), $"Processing mod {meta.GetId()}...");
+						data.ProgressCallback(0.5f + 0.4f * ((float)i / data.Mods.Length), $"Processing mod {meta.Id}...");
 						await UniTask.Yield();
 
 						var obj = meta.ToObject();
 
 						obj["kernel"] = new JObject {
-							["active"]      = meta.GetCustom("kernel", mod.GetModType() == "kernel"),
+							["active"]      = meta.GetCustom("kernel", mod.ModType == "kernel"),
 							["base_path"]   = GetPath(mod.GetData<string>("folder")),
 							["assets_path"] = GetPath(mod.GetData<string>("assets")),
 							["definition"]  = GetPath(mod.GetData<string>("definition")),
@@ -183,7 +183,7 @@ namespace Nox.GameBuilder.Pipeline {
 						};
 
 						var assetResult = resultAssets
-							.FirstOrDefault(r => r.mod.GetMetadata().Match(meta.GetId()));
+							.FirstOrDefault(r => r.mod.Metadata.Match(meta.Id));
 
 						JArray assetObj = new();
 						if (assetResult != null)
@@ -279,7 +279,7 @@ namespace Nox.GameBuilder.Pipeline {
 
 		public static IMod[] GetKernelMods(IMod[] mods)
 			=> mods
-				.Where(m => m.GetModType() == "kernel")
+				.Where(m => m.ModType == "kernel")
 				.ToArray();
 
 		private static void PrepareOutputDirectory(GameBuildData data) {

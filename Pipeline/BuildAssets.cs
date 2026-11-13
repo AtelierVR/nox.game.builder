@@ -22,7 +22,7 @@ namespace Nox.GameBuilder.Pipeline {
 			List<AssetBundleBuildResult> results = new();
 
 			for (int i = 0; i < mod.Length; i++) {
-				var buildname   = mod[i].GetMetadata().GetId();
+				var buildname   = mod[i].Metadata.Id;
 				var assetfolder = mod[i].GetData<string>("assets");
 
 				if (!Directory.Exists(assetfolder)) continue;
@@ -47,7 +47,7 @@ namespace Nox.GameBuilder.Pipeline {
 
 
 				foreach (var asset in assets)
-					Logger.Log($"Asset for {mod[i].GetMetadata().GetId()}: {asset}");
+					Logger.Log($"Asset for {mod[i].Metadata.Id}: {asset}");
 
 				List<string> resultOutputs = new();
 

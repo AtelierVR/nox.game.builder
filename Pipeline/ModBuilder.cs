@@ -71,10 +71,10 @@ namespace Nox.GameBuilder.Pipeline {
 
 				var targets = new List<(IMod mod, Nox.ModLoader.Typing.ModMetadata meta, string folder)>();
 				foreach (var id in data.ModIds) {
-					var m = allMods.FirstOrDefault(x => x.GetMetadata().GetId().Equals(id, StringComparison.OrdinalIgnoreCase));
+					var m = allMods.FirstOrDefault(x => x.Metadata.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 					if (m == null)
 						return Finish(new BuildResult { Type = BuildResultType.Failed, Message = $"Mod not found: {id}" });
-					targets.Add((m, (Nox.ModLoader.Typing.ModMetadata)m.GetMetadata(), m.GetData<string>("folder")));
+					targets.Add((m, (Nox.ModLoader.Typing.ModMetadata)m.Metadata, m.GetData<string>("folder")));
 				}
 
 				// ── 1. Build player (to get platform-correct assemblies) ─
@@ -115,11 +115,11 @@ namespace Nox.GameBuilder.Pipeline {
 
 				for (int i = 0; i < total; i++) {
 					var (mod, meta, modFolder) = targets[i];
-					var modOutput = Path.Combine(data.OutputPath, meta.GetId());
+					var modOutput = Path.Combine(data.OutputPath, meta.Id);
 					Directory.CreateDirectory(modOutput);
 
 					var baseProgress = 0.3f + (0.6f * i / total);
-					data.ProgressCallback(baseProgress, $"Processing {meta.GetId()}...");
+					data.ProgressCallback(baseProgress, $"Processing {meta.Id}...");
 					await UniTask.Yield();
 
 					// ── 2a. Build asset bundles ────────────────────
@@ -129,7 +129,7 @@ namespace Nox.GameBuilder.Pipeline {
 					var assetResults = BuildAssets.BuildAsAssetBundles(new[] { mod }, platform, bundleTemp);
 
 					if (assetResults == null) {
-						Logger.LogWarning($"Asset bundle build failed for {meta.GetId()}, continuing without bundles.", tag: nameof(ModBuild));
+						Logger.LogWarning($"Asset bundle build failed for {meta.Id}, continuing without bundles.", tag: nameof(ModBuild));
 					} else {
 						Directory.CreateDirectory(assetsDir);
 						foreach (var src in assetResults.SelectMany(r => r.outputs))
@@ -244,7 +244,7 @@ namespace Nox.GameBuilder.Pipeline {
 
 
 					// ── 2b2. Resolve entrypoint assemblies ──────
-					var entries = meta.GetEntryPoints();
+					var entries = meta.EntryPoints;
 					var dllNames = new HashSet<string>(copiedDlls.Select(d => Path.GetFileNameWithoutExtension(d.path)));
 					foreach (var section in entries.All) {
 						foreach (var element in section.Value) {
@@ -254,7 +254,7 @@ namespace Nox.GameBuilder.Pipeline {
 								element.Assembly = element.Namespace;
 								Logger.Log($"Resolved entrypoint assembly: {element.Namespace}.{element.Class} → {element.Namespace}", tag: nameof(ModBuild));
 							} else {
-								Logger.LogWarning($"Could not resolve assembly for entrypoint {element.FullName} in mod {meta.GetId()}", tag: nameof(ModBuild));
+								Logger.LogWarning($"Could not resolve assembly for entrypoint {element.FullName} in mod {meta.Id}", tag: nameof(ModBuild));
 							}
 						}
 					}
@@ -271,8 +271,8 @@ namespace Nox.GameBuilder.Pipeline {
 
 					totalDlls    += copiedDlls.Count;
 					totalBundles += bundleAssets.Count;
-					Logger.Log($"  Built {meta.GetId()}: {copiedDlls.Count} DLLs, {bundleAssets.Count} bundles", tag: nameof(ModBuild));
-					NoxInvokableAttribute.Invoke("build:mod:mod:done", meta.GetId(), copiedDlls.Count, bundleAssets.Count);
+					Logger.Log($"  Built {meta.Id}: {copiedDlls.Count} DLLs, {bundleAssets.Count} bundles", tag: nameof(ModBuild));
+					NoxInvokableAttribute.Invoke("build:mod:mod:done", meta.Id, copiedDlls.Count, bundleAssets.Count);
 				}
 
 				// Cleanup

@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Cysharp.Threading.Tasks;
-using Nox.CCK.Language;
+using Nox.CCK.Mods.Metadata;
 using Nox.CCK.Utils;
 using Nox.Editor.Panel;
 using Nox.GameBuilder.Pipeline;
 using Nox.ModLoader;
 using UnityEditor;
-using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using IPanel = Nox.Editor.Panel.IPanel;
@@ -18,25 +17,32 @@ using Logger = Nox.CCK.Utils.Logger;
 namespace Nox.GameBuilder {
 	public class ModBuilderInstance : IInstance {
 		private readonly ModBuilderPanel _panel;
-		private readonly IWindow          _window;
+		private readonly IWindow _window;
 
 		private VisualElement _modsList;
-		private TextField     _outputField;
+		private TextField _outputField;
 		private DropdownField _platformEnum;
-		private Button        _buildButton;
+		private Button _buildButton;
 		private VisualElement _buildingContainer;
-		private Label         _statusLabel;
-		private ProgressBar   _progressBar;
+		private Label _statusLabel;
+		private ProgressBar _progressBar;
 		private VisualElement _resultContainer;
-		private Label         _successLabel;
-		private Label         _failedLabel;
-		private Label         _detailsLabel;
+		private Label _successLabel;
+		private Label _failedLabel;
+		private Label _detailsLabel;
 
-		private HashSet<string>   _selectedModIds = new();
-		private List<VisualElement> _modItems       = new();
+		private HashSet<string> _selectedModIds = new();
+		private List<VisualElement> _modItems = new();
+
+		/// <summary>
+		/// Name order of the mod entries: culture-aware, like the <c>OrderBy(m =&gt; m.Name ?? m.Id)</c> it replaces.
+		/// Static so a panel refresh does not allocate a new delegate.
+		/// </summary>
+		private static readonly Comparison<IModMetadata> _byName = (a, b)
+			=> string.Compare(a.Name ?? a.Id, b.Name ?? b.Id, StringComparison.CurrentCulture);
 
 		public ModBuilderInstance(ModBuilderPanel panel, IWindow window, Dictionary<string, object> data) {
-			_panel  = panel;
+			_panel = panel;
 			_window = window;
 			ModBuild.OnModBuildFinished.AddListener(OnModBuildFinished);
 			ModBuild.OnModBuildStarted.AddListener(OnModBuildStarted);
@@ -63,17 +69,17 @@ namespace Nox.GameBuilder {
 			var tree = _panel.API.AssetAPI.GetAsset<VisualTreeAsset>("panels/mod_builder.uxml");
 			var root = tree.CloneTree();
 
-			_modsList         = root.Q<VisualElement>("mods-list");
-			_outputField      = root.Q<TextField>("output");
-			_platformEnum     = root.Q<DropdownField>("platform");
-			_buildButton      = root.Q<Button>("build");
+			_modsList = root.Q<VisualElement>("mods-list");
+			_outputField = root.Q<TextField>("output");
+			_platformEnum = root.Q<DropdownField>("platform");
+			_buildButton = root.Q<Button>("build");
 			_buildingContainer = root.Q<VisualElement>("building");
-			_statusLabel      = root.Q<Label>("status");
-			_progressBar      = root.Q<ProgressBar>("progress");
-			_resultContainer  = root.Q<VisualElement>("result");
-			_successLabel     = root.Q<Label>("success");
-			_failedLabel      = root.Q<Label>("failed");
-			_detailsLabel     = root.Q<Label>("details");
+			_statusLabel = root.Q<Label>("status");
+			_progressBar = root.Q<ProgressBar>("progress");
+			_resultContainer = root.Q<VisualElement>("result");
+			_successLabel = root.Q<Label>("success");
+			_failedLabel = root.Q<Label>("failed");
+			_detailsLabel = root.Q<Label>("details");
 
 			// Output
 			_outputField.value = ModBuilderPanel.OutputFolder;
@@ -100,9 +106,9 @@ namespace Nox.GameBuilder {
 			};
 
 			// Select All / Deselect All
-			var selectAll   = root.Q<Button>("select-all");
+			var selectAll = root.Q<Button>("select-all");
 			var deselectAll = root.Q<Button>("deselect-all");
-			selectAll.clicked   += () => SelectAllMods(true);
+			selectAll.clicked += () => SelectAllMods(true);
 			deselectAll.clicked += () => SelectAllMods(false);
 
 			// Platform
@@ -125,12 +131,17 @@ namespace Nox.GameBuilder {
 			_modItems.Clear();
 
 			try {
-				var mods = Nox.ModLoader.ModManager.Mods
-					.Select(m => m.GetMetadata())
-					.GroupBy(m => m.GetId())
-					.Select(g => g.First())
-					.OrderBy(m => m.GetName() ?? m.GetId())
-					.ToList();
+				var mods = new List<IModMetadata>();
+				var ids = new HashSet<string>();
+
+				foreach (var mod in ModManager.Mods) {
+					var meta = mod?.Metadata;
+					if (meta == null || !ids.Add(meta.Id ?? string.Empty))
+						continue;
+					mods.Add(meta);
+				}
+
+				mods.Sort(_byName);
 
 				var itemAsset = _panel.API.AssetAPI.GetAsset<VisualTreeAsset>("panels/mod_item.uxml");
 				var persisted = (ModBuilderPanel.SelectedMods ?? "").Split(',')
@@ -138,9 +149,9 @@ namespace Nox.GameBuilder {
 
 				foreach (var meta in mods) {
 					var item = itemAsset.CloneTree();
-					var id   = meta.GetId();
+					var id = meta.Id;
 					item.Q<Label>("id").text = id;
-					item.Q<Label>("name").text = meta.GetName() ?? id;
+					item.Q<Label>("name").text = meta.Name ?? id;
 
 					if (persisted.Contains(id)) {
 						_selectedModIds.Add(id);
@@ -171,7 +182,7 @@ namespace Nox.GameBuilder {
 			foreach (var item in _modItems) {
 				var id = item.Q<Label>("id").text;
 				if (select) _selectedModIds.Add(id);
-				else        _selectedModIds.Remove(id);
+				else _selectedModIds.Remove(id);
 				UpdateItemHighlight(item, id);
 			}
 			SaveSelection();
@@ -191,9 +202,9 @@ namespace Nox.GameBuilder {
 			}
 
 			var data = new ModBuildData {
-				ModIds     = _selectedModIds.ToArray(),
+				ModIds = _selectedModIds.ToArray(),
 				OutputPath = _outputField.value,
-				Target     = _platformEnum.value.GetPlatformFromName(),
+				Target = _platformEnum.value.GetPlatformFromName(),
 			};
 
 			ModBuild.Build(data).Forget();
@@ -215,8 +226,8 @@ namespace Nox.GameBuilder {
 			RefreshLists();
 
 			_successLabel.style.display = result.IsFailed ? DisplayStyle.None : DisplayStyle.Flex;
-			_failedLabel.style.display  = result.IsFailed ? DisplayStyle.Flex : DisplayStyle.None;
-			_detailsLabel.text          = result.Message;
+			_failedLabel.style.display = result.IsFailed ? DisplayStyle.Flex : DisplayStyle.None;
+			_detailsLabel.text = result.Message;
 			ShowResult(true);
 		}
 

@@ -229,7 +229,7 @@ namespace Nox.GameBuilder {
 			var itemTemplate = _panel.API.AssetAPI.GetAsset<VisualTreeAsset>("panels/mod_item.uxml");
 
 			foreach (var mod in mods) {
-				var meta      = mod.GetMetadata();
+				var meta      = mod.Metadata;
 				var container = itemTemplate.CloneTree();
 
 				var iconPath = meta.GetIcon();
@@ -239,8 +239,8 @@ namespace Nox.GameBuilder {
 				image.image = icon;
 				if (icon != null) image.style.backgroundColor = StyleKeyword.Null;
 
-				container.Q<Label>("name").text = meta.GetName();
-				container.Q<Label>("id").text   = meta.GetId();
+				container.Q<Label>("name").text = meta.Name;
+				container.Q<Label>("id").text   = meta.Id;
 				_modsList.Add(container);
 			}
 
