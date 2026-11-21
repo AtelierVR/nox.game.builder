@@ -289,10 +289,7 @@ namespace Nox.GameBuilder.Pipeline {
 			}
 
 			if (IsOutputEmpty(data.OutputPath) || AllowClearOutput(data)) {
-				if (!IsOutputEmpty(data.OutputPath)) {
-					Directory.Delete(data.OutputPath, true);
-					Directory.CreateDirectory(data.OutputPath);
-				}
+				ClearDirectory(data.OutputPath);
 				return;
 			}
 
@@ -300,6 +297,24 @@ namespace Nox.GameBuilder.Pipeline {
 				$"Output folder is not empty: {data.OutputPath}. " +
 				"Pass BuildFlags.AutoConfirmClearOutput or clear the folder manually."
 			);
+		}
+
+		/// <summary>
+		/// Empties <paramref name="path"/> without removing it: the folder itself can be held by another process
+		/// (an editor or a terminal opened on it), which makes deleting it fail while its contents are free.
+		/// </summary>
+		private static void ClearDirectory(string path) {
+			foreach (var entry in Directory.GetFileSystemEntries(path)) {
+				var attributes = File.GetAttributes(entry);
+
+				if ((attributes & FileAttributes.ReadOnly) != 0)
+					File.SetAttributes(entry, attributes & ~FileAttributes.ReadOnly);
+
+				if ((attributes & FileAttributes.Directory) != 0)
+					Directory.Delete(entry, true);
+				else
+					File.Delete(entry);
+			}
 		}
 
 		private static bool IsOutputEmpty(string path)
